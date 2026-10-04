@@ -39,3 +39,4 @@ public class ClickGuiScreen extends Screen {
         return super.keyPressed(keyCode, scanCode, modifiers);
     }
                                }
+
