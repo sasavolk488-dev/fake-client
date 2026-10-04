@@ -7,43 +7,45 @@ import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.text.Text;
 import org.lwjgl.glfw.GLFW;
 
-import java.awt.Color;
 import java.util.List;
 
 public class ClickGuiScreen extends Screen {
 
-    // ===== Размеры окна =====
     private static final int W = 380;
     private static final int H = 240;
-    private static final int HEADER_H = 28;
-    private static final int SIDEBAR_W = 90;
-    private static final int ROW_H = 22;
-    private static final int ROW_GAP = 4;
-    private static final int COL_GAP = 6;
+    private static final int HEADER_H = 26;
+    private static final int SIDEBAR_W = 85;
+    private static final int ROW_H = 20;
+    private static final int ROW_GAP = 5;
+    private static final int COL_GAP = 5;
+
+    private static final int BG_MAIN       = 0xFF23232A;
+    private static final int BG_HEADER     = 0xFF1B1B20;
+    private static final int BG_SIDEBAR    = 0xFF1B1B20;
+    private static final int BG_ROW        = 0xFF2B2B32;
+    private static final int BG_ROW_HOVER  = 0xFF33333A;
+    private static final int BG_SEARCH     = 0xFF25252C;
+    private static final int BG_CAT_ACTIVE = 0xFF26262E;
+    private static final int BG_CAT_HOVER  = 0xFF1F1F26;
+    private static final int BG_TOGGLE_OFF = 0xFF3A3A42;
 
     private float guiX = 8;
     private float guiY = 20;
 
     private int selectedCategory = 0;
-
-    private static final String[] CATS = {
-            "Combat", "Movement", "Render", "Misc"
-    };
+    private static final String[] CATS = {"Combat", "Movement", "Render", "Misc"};
 
     private boolean dragging = false;
     private double dragOffX, dragOffY;
 
     private long openTime;
-    private float openAnim = 0f;
 
     public ClickGuiScreen() {
         super(Text.literal("ClickGUI"));
     }
 
     @Override
-    public boolean shouldPause() {
-        return false;
-    }
+    public boolean shouldPause() { return false; }
 
     @Override
     protected void init() {
@@ -53,21 +55,18 @@ public class ClickGuiScreen extends Screen {
 
     @Override
     public void render(DrawContext ctx, int mouseX, int mouseY, float delta) {
-        // анимация открытия
         long elapsed = System.currentTimeMillis() - openTime;
-        float t = Math.min(1f, elapsed / 200f);
-        openAnim = 1f - (1f - t) * (1f - t);
+        float t = Math.min(1f, elapsed / 180f);
+        float openAnim = 1f - (1f - t) * (1f - t);
 
         ctx.fill(0, 0, width, height, ((int) (0x50 * openAnim)) << 24);
 
-        // анимация тумблеров
         for (Module m : ModuleManager.modules) {
             float target = m.enabled ? 1f : 0f;
             m.anim += (target - m.anim) * 0.25f;
         }
 
-        // масштаб при открытии
-        float scale = 0.95f + 0.05f * openAnim;
+        float scale = 0.96f + 0.04f * openAnim;
         int cx = (int) guiX + W / 2;
         int cy = (int) guiY + H / 2;
 
@@ -85,67 +84,45 @@ public class ClickGuiScreen extends Screen {
         int x = (int) guiX;
         int y = (int) guiY;
 
-        // тень
-        ctx.fill(x + 4, y + 5, x + W + 4, y + H + 5, 0x60000000);
+        ctx.fill(x + 3, y + 4, x + W + 3, y + H + 4, 0x60000000);
+        ctx.fill(x, y, x + W, y + H, BG_MAIN);
+        ctx.fill(x, y, x + W, y + HEADER_H, BG_HEADER);
 
-        // основное окно
-        ctx.fill(x, y, x + W, y + H, 0xFF14141A);
+        drawStar(ctx, x + 9, y + 9, 0xFFFFFFFF);
 
-        // шапка
-        ctx.fill(x, y, x + W, y + HEADER_H, 0xFF101015);
-
-        // разделитель под шапкой
-        ctx.fill(x, y + HEADER_H - 1, x + W, y + HEADER_H, 0xFF22222A);
-
-        // радужная полоска сверху (тонкая)
-        for (int i = 0; i < W; i++) {
-            float hue = ((System.currentTimeMillis() % 4000L) / 4000f + i * 0.004f) % 1f;
-            int col = Color.HSBtoRGB(hue, 0.65f, 1f) | 0xFF000000;
-            ctx.fill(x + i, y, x + i + 1, y + 2, col);
-        }
-
-        // логотип (маленькая звёздочка)
-        drawStar(ctx, x + 10, y + 9, 0xFFFFFFFF);
-
-        // заголовок
-        ctx.drawTextWithShadow(textRenderer, Text.literal("Client"), x + 26, y + 10, 0xFF6A6A72);
-        ctx.drawTextWithShadow(textRenderer, Text.literal(" / "), x + 58, y + 10, 0xFF3A3A42);
+        ctx.drawTextWithShadow(textRenderer, Text.literal("Client"), x + 24, y + 9, 0xFF77778A);
+        ctx.drawTextWithShadow(textRenderer, Text.literal(" / "), x + 56, y + 9, 0xFF3A3A42);
         ctx.drawTextWithShadow(textRenderer, Text.literal(CATS[selectedCategory]),
-                x + 72, y + 10, 0xFFFFFFFF);
+                x + 68, y + 9, 0xFFFFFFFF);
 
-        // плейсхолдер поиска справа
-        int sw = 100;
+        int sw = 95;
         int sx = x + W - sw - 8;
-        ctx.fill(sx, y + 7, sx + sw, y + 22, 0xFF1F1F26);
+        ctx.fill(sx, y + 6, sx + sw, y + 20, BG_SEARCH);
         ctx.drawTextWithShadow(textRenderer, Text.literal("Search..."),
-                sx + 6, y + 11, 0xFF56565E);
+                sx + 6, y + 9, 0xFF56565E);
 
-        // ===== Сайдбар =====
-        ctx.fill(x, y + HEADER_H, x + SIDEBAR_W, y + H, 0xFF101015);
-        ctx.fill(x + SIDEBAR_W, y + HEADER_H, x + SIDEBAR_W + 1, y + H, 0xFF22222A);
+        ctx.fill(x, y + HEADER_H, x + SIDEBAR_W, y + H, BG_SIDEBAR);
+        ctx.fill(x + SIDEBAR_W, y + HEADER_H, x + SIDEBAR_W + 1, y + H, 0xFF16161A);
 
         for (int i = 0; i < CATS.length; i++) {
-            int cy2 = y + HEADER_H + 12 + i * 28;
+            int cy2 = y + HEADER_H + 10 + i * 25;
             boolean hover = mouseX >= x + 4 && mouseX <= x + SIDEBAR_W - 4
-                    && mouseY >= cy2 && mouseY <= cy2 + 22;
+                    && mouseY >= cy2 && mouseY <= cy2 + 20;
 
             if (i == selectedCategory) {
-                ctx.fill(x + 4, cy2, x + SIDEBAR_W - 4, cy2 + 22, 0xFF22222C);
-                ctx.fill(x + 4, cy2, x + 6, cy2 + 22, rainbow(0));
+                ctx.fill(x + 4, cy2, x + SIDEBAR_W - 4, cy2 + 20, BG_CAT_ACTIVE);
             } else if (hover) {
-                ctx.fill(x + 4, cy2, x + SIDEBAR_W - 4, cy2 + 22, 0xFF1A1A20);
+                ctx.fill(x + 4, cy2, x + SIDEBAR_W - 4, cy2 + 20, BG_CAT_HOVER);
             }
 
-            // маленькая точка-иконка
             int dotColor = i == selectedCategory ? 0xFFFFFFFF : 0xFF5A5A62;
-            ctx.fill(x + 14, cy2 + 9, x + 18, cy2 + 13, dotColor);
+            ctx.fill(x + 11, cy2 + 8, x + 15, cy2 + 12, dotColor);
 
             int textColor = i == selectedCategory ? 0xFFFFFFFF : 0xFF9A9AA2;
             ctx.drawTextWithShadow(textRenderer, Text.literal(CATS[i]),
-                    x + 26, cy2 + 7, textColor);
+                    x + 22, cy2 + 6, textColor);
         }
 
-        // ===== Сетка модулей (2 колонки) =====
         int contentX = x + SIDEBAR_W + 8;
         int contentY = y + HEADER_H + 8;
         int contentW = W - SIDEBAR_W - 16;
@@ -166,42 +143,30 @@ public class ClickGuiScreen extends Screen {
             boolean hover = mouseX >= cardX && mouseX <= cardX + colW
                     && mouseY >= cardY && mouseY <= cardY + ROW_H;
 
-            int bg = hover ? 0xFF23232E : 0xFF1E1E26;
-            ctx.fill(cardX, cardY, cardX + colW, cardY + ROW_H, bg);
+            ctx.fill(cardX, cardY, cardX + colW, cardY + ROW_H,
+                    hover ? BG_ROW_HOVER : BG_ROW);
 
-            // текст
-            int textColor = m.enabled ? 0xFFFFFFFF : 0xFF9A9AA2;
+            int textColor = m.enabled ? 0xFFFFFFFF : 0xFFAAAAAA;
             ctx.drawTextWithShadow(textRenderer, Text.literal(m.name),
-                    cardX + 8, cardY + 7, textColor);
+                    cardX + 7, cardY + 6, textColor);
 
-            // тумблер
-            int tsw = 22;
-            int tsh = 12;
-            int tx = cardX + colW - tsw - 8;
+            int tsw = 20;
+            int tsh = 11;
+            int tx = cardX + colW - tsw - 6;
             int ty = cardY + (ROW_H - tsh) / 2;
 
-            // фон тумблера
-            ctx.fill(tx, ty, tx + tsw, ty + tsh, 0xFF33333E);
+            ctx.fill(tx, ty, tx + tsw, ty + tsh, BG_TOGGLE_OFF);
 
-            // заливка (по анимации)
             if (m.anim > 0.01f) {
                 int fillW = Math.max(1, (int) (tsw * m.anim));
-                int col2 = m.enabled ? rainbow(0) : 0xFF44444E;
-                ctx.fill(tx, ty, tx + fillW, ty + tsh, col2);
+                ctx.fill(tx, ty, tx + fillW, ty + tsh, 0xFFFFFFFF);
             }
 
-            // кружок
-            int knob = tsh - 2;
+            int knob = tsh - 3;
             int kx = tx + 1 + (int) ((tsw - knob - 2) * m.anim);
-            ctx.fill(kx, ty + 1, kx + knob, ty + 1 + knob, 0xFFFFFFFF);
+            int knobColor = m.anim > 0.5f ? 0xFF23232A : 0xFF888888;
+            ctx.fill(kx, ty + 1, kx + knob, ty + 1 + knob, knobColor);
         }
-
-        // футер
-        ctx.fill(x, y + H - 18, x + W, y + H, 0xFF101015);
-        ctx.drawTextWithShadow(textRenderer, Text.literal("sasavolk488"),
-                x + 10, y + H - 13, 0xFF6A6A72);
-        ctx.drawTextWithShadow(textRenderer, Text.literal("R — закрыть"),
-                x + W - 70, y + H - 13, 0xFF4A4A52);
     }
 
     private void drawStar(DrawContext ctx, int x, int y, int color) {
@@ -210,17 +175,11 @@ public class ClickGuiScreen extends Screen {
         ctx.fill(x + 2, y + 4, x + 4, y + 6, color);
     }
 
-    private int rainbow(int offset) {
-        float hue = ((System.currentTimeMillis() % 4000L) / 4000f + offset * 0.08f) % 1f;
-        return Color.HSBtoRGB(hue, 0.75f, 1f) | 0xFF000000;
-    }
-
     @Override
     public boolean mouseClicked(double mx, double my, int button) {
         int x = (int) guiX;
         int y = (int) guiY;
 
-        // шапка — перетаскивание
         if (mx >= x && mx <= x + W && my >= y && my <= y + HEADER_H) {
             dragging = true;
             dragOffX = mx - guiX;
@@ -228,16 +187,14 @@ public class ClickGuiScreen extends Screen {
             return true;
         }
 
-        // категории
         for (int i = 0; i < CATS.length; i++) {
-            int cy2 = y + HEADER_H + 12 + i * 28;
-            if (mx >= x + 4 && mx <= x + SIDEBAR_W - 4 && my >= cy2 && my <= cy2 + 22) {
+            int cy2 = y + HEADER_H + 10 + i * 25;
+            if (mx >= x + 4 && mx <= x + SIDEBAR_W - 4 && my >= cy2 && my <= cy2 + 20) {
                 selectedCategory = i;
                 return true;
             }
         }
 
-        // модули
         int contentX = x + SIDEBAR_W + 8;
         int contentY = y + HEADER_H + 8;
         int contentW = W - SIDEBAR_W - 16;
@@ -282,4 +239,4 @@ public class ClickGuiScreen extends Screen {
         }
         return super.keyPressed(keyCode, scanCode, modifiers);
     }
-                       }
+}
