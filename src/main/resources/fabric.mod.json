@@ -1,0 +1,21 @@
+{
+	"schemaVersion": 1,
+	"id": "fake_client",
+	"version": "1.0.0",
+	"name": "Fake_client",
+	"description": "Fake Client",
+	"authors": ["sasavolk488-dev"],
+	"license": "CC0-1.0",
+	"environment": "client",
+	"entrypoints": {
+		"client": [
+			"com.example.client.Fake_clientClient"
+		]
+	},
+	"depends": {
+		"fabricloader": ">=0.16.9",
+		"minecraft": "~1.21.4",
+		"java": ">=21",
+		"fabric-api": "*"
+	}
+}
