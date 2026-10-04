@@ -307,6 +307,6 @@ public class ClickGuiScreen extends Screen {
     }
 
     private static int rainbow(int offset, float speed) {
-        double t = Util.getMillis() / 4000.0;
+        double t = (System.currentTimeMillis() % 4000L) / 4000.0;
         float hue = (float) ((t + offset * 0.08 * speed) % 1.0);
         return Color.HSBtoRGB
