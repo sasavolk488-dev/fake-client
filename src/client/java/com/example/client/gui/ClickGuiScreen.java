@@ -1,112 +1,75 @@
 package com.example.client.gui;
+
+import com.example.client.module.Module;
+import com.example.client.module.ModuleManager;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.text.Text;
 import org.lwjgl.glfw.GLFW;
 
 import java.awt.Color;
-import java.util.ArrayList;
 import java.util.List;
 
 public class ClickGuiScreen extends Screen {
 
-    private static final int W = 400;
-    private static final int H = 280;
+    // ===== Размеры окна =====
+    private static final int W = 380;
+    private static final int H = 240;
     private static final int HEADER_H = 28;
-    private static final int SIDEBAR_W = 110;
-    private static final int ROW_H = 38;
+    private static final int SIDEBAR_W = 90;
+    private static final int ROW_H = 22;
+    private static final int ROW_GAP = 4;
+    private static final int COL_GAP = 6;
 
-    private float guiX = 20, guiY = 20;
-    private long openTime;
-    private float openAnim = 0f;
+    private float guiX = 8;
+    private float guiY = 20;
 
-    private int selectedTab = 0;
     private int selectedCategory = 0;
 
-    private static final String[] TABS = {"Modules", "Favorites", "Configs"};
-    private static final String[] CATS = {"Combat", "Movement", "Render", "Player", "Misc"};
-
-    public static class Mod {
-        String name;
-        boolean enabled;
-        float anim;
-        Mod(String n, boolean e) { name = n; enabled = e; anim = e ? 1f : 0f; }
-    }
-
-    private static final List<List<Mod>> MODULES = new ArrayList<>();
-    static {
-        List<Mod> combat = new ArrayList<>();
-        combat.add(new Mod("KillAura", true));
-        combat.add(new Mod("AutoClicker", true));
-        combat.add(new Mod("Reach", false));
-        combat.add(new Mod("Velocity", true));
-        combat.add(new Mod("Criticals", false));
-        MODULES.add(combat);
-
-        List<Mod> movement = new ArrayList<>();
-        movement.add(new Mod("Sprint", true));
-        movement.add(new Mod("Fly", false));
-        movement.add(new Mod("Speed", true));
-        movement.add(new Mod("NoFall", false));
-        movement.add(new Mod("Jesus", false));
-        MODULES.add(movement);
-
-        List<Mod> render = new ArrayList<>();
-        render.add(new Mod("ESP", true));
-        render.add(new Mod("Tracers", false));
-        render.add(new Mod("Fullbright", true));
-        render.add(new Mod("Xray", false));
-        MODULES.add(render);
-
-        List<Mod> player = new ArrayList<>();
-        player.add(new Mod("ChestStealer", true));
-        player.add(new Mod("FastPlace", true));
-        player.add(new Mod("AutoTool", false));
-        MODULES.add(player);
-
-        List<Mod> misc = new ArrayList<>();
-        misc.add(new Mod("Hud", true));
-        misc.add(new Mod("AntiAFK", true));
-        misc.add(new Mod("NameProtect", false));
-        MODULES.add(misc);
-    }
+    private static final String[] CATS = {
+            "Combat", "Movement", "Render", "Misc"
+    };
 
     private boolean dragging = false;
     private double dragOffX, dragOffY;
+
+    private long openTime;
+    private float openAnim = 0f;
 
     public ClickGuiScreen() {
         super(Text.literal("ClickGUI"));
     }
 
     @Override
-    public boolean shouldPause() { return false; }
+    public boolean shouldPause() {
+        return false;
+    }
 
     @Override
     protected void init() {
         super.init();
         openTime = System.currentTimeMillis();
-        openAnim = 0f;
     }
 
     @Override
     public void render(DrawContext ctx, int mouseX, int mouseY, float delta) {
+        // анимация открытия
         long elapsed = System.currentTimeMillis() - openTime;
-        float t = Math.min(1f, elapsed / 220f);
+        float t = Math.min(1f, elapsed / 200f);
         openAnim = 1f - (1f - t) * (1f - t);
 
-        int alpha = (int)(0x60 * openAnim);
-        ctx.fill(0, 0, width, height, alpha << 24);
+        ctx.fill(0, 0, width, height, ((int) (0x50 * openAnim)) << 24);
 
-        for (List<Mod> list : MODULES) {
-            for (Mod m : list) {
-                float target = m.enabled ? 1f : 0f;
-                m.anim += (target - m.anim) * 0.2f;
-            }
+        // анимация тумблеров
+        for (Module m : ModuleManager.modules) {
+            float target = m.enabled ? 1f : 0f;
+            m.anim += (target - m.anim) * 0.25f;
         }
 
-        float scale = 0.93f + 0.07f * openAnim;
-        int cx = (int)guiX + W / 2;
-        int cy = (int)guiY + H / 2;
+        // масштаб при открытии
+        float scale = 0.95f + 0.05f * openAnim;
+        int cx = (int) guiX + W / 2;
+        int cy = (int) guiY + H / 2;
 
         ctx.getMatrices().push();
         ctx.getMatrices().translate(cx, cy, 0);
@@ -119,107 +82,132 @@ public class ClickGuiScreen extends Screen {
     }
 
     private void drawWindow(DrawContext ctx, int mouseX, int mouseY) {
-        int x = (int)guiX;
-        int y = (int)guiY;
+        int x = (int) guiX;
+        int y = (int) guiY;
 
-        ctx.fill(x + 6, y + 8, x + W + 6, y + H + 8, 0x70000000);
-        ctx.fill(x, y, x + W, y + H, 0xF0121216);
-        ctx.fill(x, y, x + W, y + HEADER_H, 0xFF19191E);
+        // тень
+        ctx.fill(x + 4, y + 5, x + W + 4, y + H + 5, 0x60000000);
 
+        // основное окно
+        ctx.fill(x, y, x + W, y + H, 0xFF14141A);
+
+        // шапка
+        ctx.fill(x, y, x + W, y + HEADER_H, 0xFF101015);
+
+        // разделитель под шапкой
+        ctx.fill(x, y + HEADER_H - 1, x + W, y + HEADER_H, 0xFF22222A);
+
+        // радужная полоска сверху (тонкая)
         for (int i = 0; i < W; i++) {
             float hue = ((System.currentTimeMillis() % 4000L) / 4000f + i * 0.004f) % 1f;
-            int col = Color.HSBtoRGB(hue, 0.7f, 1f) | 0xFF000000;
-            ctx.fill(x + i, y, x + i + 1, y + 3, col);
+            int col = Color.HSBtoRGB(hue, 0.65f, 1f) | 0xFF000000;
+            ctx.fill(x + i, y, x + i + 1, y + 2, col);
         }
 
-        ctx.drawTextWithShadow(textRenderer, Text.literal("ClickGUI"),
-                x + 10, y + 10, 0xFFFFFFFF);
+        // логотип (маленькая звёздочка)
+        drawStar(ctx, x + 10, y + 9, 0xFFFFFFFF);
 
-        int tabX = x + 90;
-        for (int i = 0; i < TABS.length; i++) {
-            String tab = TABS[i];
-            int tw = textRenderer.getWidth(tab) + 12;
-            boolean hover = mouseX >= tabX && mouseX <= tabX + tw
-                    && mouseY >= y + 5 && mouseY <= y + HEADER_H - 5;
-            if (i == selectedTab) {
-                ctx.fill(tabX, y + 5, tabX + tw, y + HEADER_H - 5, 0xFF2A2A36);
-                ctx.fill(tabX, y + HEADER_H - 7, tabX + tw, y + HEADER_H - 5, rainbow(0));
-            } else if (hover) {
-                ctx.fill(tabX, y + 5, tabX + tw, y + HEADER_H - 5, 0xFF1F1F28);
-            }
-            int txtColor = i == selectedTab ? 0xFFFFFFFF : 0xFFAAAAAA;
-            ctx.drawTextWithShadow(textRenderer, Text.literal(tab),
-                    tabX + 6, y + 10, txtColor);
-            tabX += tw + 2;
-        }
+        // заголовок
+        ctx.drawTextWithShadow(textRenderer, Text.literal("Client"), x + 26, y + 10, 0xFF6A6A72);
+        ctx.drawTextWithShadow(textRenderer, Text.literal(" / "), x + 58, y + 10, 0xFF3A3A42);
+        ctx.drawTextWithShadow(textRenderer, Text.literal(CATS[selectedCategory]),
+                x + 72, y + 10, 0xFFFFFFFF);
 
-        ctx.fill(x, y + HEADER_H, x + SIDEBAR_W, y + H, 0xFF16161A);
-        ctx.fill(x + SIDEBAR_W, y + HEADER_H, x + SIDEBAR_W + 1, y + H, 0xFF2A2A32);
+        // плейсхолдер поиска справа
+        int sw = 100;
+        int sx = x + W - sw - 8;
+        ctx.fill(sx, y + 7, sx + sw, y + 22, 0xFF1F1F26);
+        ctx.drawTextWithShadow(textRenderer, Text.literal("Search..."),
+                sx + 6, y + 11, 0xFF56565E);
+
+        // ===== Сайдбар =====
+        ctx.fill(x, y + HEADER_H, x + SIDEBAR_W, y + H, 0xFF101015);
+        ctx.fill(x + SIDEBAR_W, y + HEADER_H, x + SIDEBAR_W + 1, y + H, 0xFF22222A);
 
         for (int i = 0; i < CATS.length; i++) {
-            int cy = y + HEADER_H + 10 + i * 32;
-            int cw = SIDEBAR_W - 12;
-            int cx2 = x + 6;
-            boolean hover = mouseX >= cx2 && mouseX <= cx2 + cw
-                    && mouseY >= cy && mouseY <= cy + 26;
+            int cy2 = y + HEADER_H + 12 + i * 28;
+            boolean hover = mouseX >= x + 4 && mouseX <= x + SIDEBAR_W - 4
+                    && mouseY >= cy2 && mouseY <= cy2 + 22;
 
             if (i == selectedCategory) {
-                ctx.fill(cx2, cy, cx2 + cw, cy + 26, 0xFF2E2E3A);
-                ctx.fill(cx2, cy, cx2 + 4, cy + 26, rainbow(0));
+                ctx.fill(x + 4, cy2, x + SIDEBAR_W - 4, cy2 + 22, 0xFF22222C);
+                ctx.fill(x + 4, cy2, x + 6, cy2 + 22, rainbow(0));
             } else if (hover) {
-                ctx.fill(cx2, cy, cx2 + cw, cy + 26, 0xFF1F1F26);
+                ctx.fill(x + 4, cy2, x + SIDEBAR_W - 4, cy2 + 22, 0xFF1A1A20);
             }
 
-            int textColor = i == selectedCategory ? 0xFFFFFFFF : 0xFFB0B0B0;
+            // маленькая точка-иконка
+            int dotColor = i == selectedCategory ? 0xFFFFFFFF : 0xFF5A5A62;
+            ctx.fill(x + 14, cy2 + 9, x + 18, cy2 + 13, dotColor);
+
+            int textColor = i == selectedCategory ? 0xFFFFFFFF : 0xFF9A9AA2;
             ctx.drawTextWithShadow(textRenderer, Text.literal(CATS[i]),
-                    cx2 + 14, cy + 9, textColor);
+                    x + 26, cy2 + 7, textColor);
         }
 
-        int listX = x + SIDEBAR_W + 14;
-        int listY = y + HEADER_H + 20;
-        int rowW = W - SIDEBAR_W - 28;
+        // ===== Сетка модулей (2 колонки) =====
+        int contentX = x + SIDEBAR_W + 8;
+        int contentY = y + HEADER_H + 8;
+        int contentW = W - SIDEBAR_W - 16;
+        int colW = (contentW - COL_GAP) / 2;
 
-        ctx.drawTextWithShadow(textRenderer, Text.literal(CATS[selectedCategory]),
-                listX, listY - 14, rainbow(0));
+        List<Module> mods = ModuleManager.byCategory(CATS[selectedCategory]);
 
-        List<Mod> mods = MODULES.get(selectedCategory);
         for (int i = 0; i < mods.size(); i++) {
-            Mod m = mods.get(i);
-            int my = listY + i * (ROW_H + 4);
-            if (my + ROW_H > y + H - 24) break;
+            Module m = mods.get(i);
+            int col = i % 2;
+            int row = i / 2;
 
-            boolean hover = mouseX >= listX && mouseX <= listX + rowW
-                    && mouseY >= my && mouseY <= my + ROW_H;
+            int cardX = contentX + col * (colW + COL_GAP);
+            int cardY = contentY + row * (ROW_H + ROW_GAP);
 
-            int bg = hover ? 0xFF25252E : 0xFF1E1E24;
-            ctx.fill(listX, my, listX + rowW, my + ROW_H, bg);
+            if (cardY + ROW_H > y + H - 4) break;
 
-            int col = m.enabled ? rainbow(0) : 0xFF3C3C46;
-            ctx.fill(listX, my, listX + 4, my + ROW_H, col);
+            boolean hover = mouseX >= cardX && mouseX <= cardX + colW
+                    && mouseY >= cardY && mouseY <= cardY + ROW_H;
 
-            int nc = m.enabled ? 0xFFFFFFFF : 0xFFA0A0A0;
+            int bg = hover ? 0xFF23232E : 0xFF1E1E26;
+            ctx.fill(cardX, cardY, cardX + colW, cardY + ROW_H, bg);
+
+            // текст
+            int textColor = m.enabled ? 0xFFFFFFFF : 0xFF9A9AA2;
             ctx.drawTextWithShadow(textRenderer, Text.literal(m.name),
-                    listX + 16, my + 15, nc);
+                    cardX + 8, cardY + 7, textColor);
 
-            int sw = 36, sh = 16;
-            int sx = listX + rowW - sw - 12;
-            int sy = my + (ROW_H - sh) / 2;
+            // тумблер
+            int tsw = 22;
+            int tsh = 12;
+            int tx = cardX + colW - tsw - 8;
+            int ty = cardY + (ROW_H - tsh) / 2;
 
-            ctx.fill(sx, sy, sx + sw, sy + sh, 0xFF3C3C46);
+            // фон тумблера
+            ctx.fill(tx, ty, tx + tsw, ty + tsh, 0xFF33333E);
 
+            // заливка (по анимации)
             if (m.anim > 0.01f) {
-                int fillW = (int)(sw * m.anim);
-                ctx.fill(sx, sy, sx + fillW, sy + sh, rainbow(0));
+                int fillW = Math.max(1, (int) (tsw * m.anim));
+                int col2 = m.enabled ? rainbow(0) : 0xFF44444E;
+                ctx.fill(tx, ty, tx + fillW, ty + tsh, col2);
             }
 
-            int knob = sh - 4;
-            int kx = sx + 2 + (int)((sw - knob - 4) * m.anim);
-            ctx.fill(kx, sy + 2, kx + knob, sy + 2 + knob, 0xFFFFFFFF);
+            // кружок
+            int knob = tsh - 2;
+            int kx = tx + 1 + (int) ((tsw - knob - 2) * m.anim);
+            ctx.fill(kx, ty + 1, kx + knob, ty + 1 + knob, 0xFFFFFFFF);
         }
 
-        ctx.fill(x, y + H - 20, x + W, y + H, 0xFF16161A);
-        ctx.drawTextWithShadow(textRenderer, Text.literal("Right Shift — закрыть"),
-                x + 10, y + H - 14, 0xFF666666);
+        // футер
+        ctx.fill(x, y + H - 18, x + W, y + H, 0xFF101015);
+        ctx.drawTextWithShadow(textRenderer, Text.literal("sasavolk488"),
+                x + 10, y + H - 13, 0xFF6A6A72);
+        ctx.drawTextWithShadow(textRenderer, Text.literal("R — закрыть"),
+                x + W - 70, y + H - 13, 0xFF4A4A52);
+    }
+
+    private void drawStar(DrawContext ctx, int x, int y, int color) {
+        ctx.fill(x + 2, y, x + 4, y + 2, color);
+        ctx.fill(x, y + 2, x + 6, y + 4, color);
+        ctx.fill(x + 2, y + 4, x + 4, y + 6, color);
     }
 
     private int rainbow(int offset) {
@@ -229,54 +217,52 @@ public class ClickGuiScreen extends Screen {
 
     @Override
     public boolean mouseClicked(double mx, double my, int button) {
-        int x = (int)guiX;
-        int y = (int)guiY;
+        int x = (int) guiX;
+        int y = (int) guiY;
 
+        // шапка — перетаскивание
         if (mx >= x && mx <= x + W && my >= y && my <= y + HEADER_H) {
-            int tabX = x + 90;
-            for (int i = 0; i < TABS.length; i++) {
-                int tw = textRenderer.getWidth(TABS[i]) + 12;
-                if (mx >= tabX && mx <= tabX + tw) {
-                    selectedTab = i;
-                    return true;
-                }
-                tabX += tw + 2;
-            }
             dragging = true;
             dragOffX = mx - guiX;
             dragOffY = my - guiY;
             return true;
         }
 
+        // категории
         for (int i = 0; i < CATS.length; i++) {
-            int cy = y + HEADER_H + 10 + i * 32;
-            int cw = SIDEBAR_W - 12;
-            int cx2 = x + 6;
-            if (mx >= cx2 && mx <= cx2 + cw && my >= cy && my <= cy + 26) {
+            int cy2 = y + HEADER_H + 12 + i * 28;
+            if (mx >= x + 4 && mx <= x + SIDEBAR_W - 4 && my >= cy2 && my <= cy2 + 22) {
                 selectedCategory = i;
                 return true;
             }
         }
 
-        int listX = x + SIDEBAR_W + 14;
-        int listY = y + HEADER_H + 20;
-        int rowW = W - SIDEBAR_W - 28;
-        List<Mod> mods = MODULES.get(selectedCategory);
+        // модули
+        int contentX = x + SIDEBAR_W + 8;
+        int contentY = y + HEADER_H + 8;
+        int contentW = W - SIDEBAR_W - 16;
+        int colW = (contentW - COL_GAP) / 2;
+        List<Module> mods = ModuleManager.byCategory(CATS[selectedCategory]);
         for (int i = 0; i < mods.size(); i++) {
-            int my2 = listY + i * (ROW_H + 4);
-            if (mx >= listX && mx <= listX + rowW && my >= my2 && my <= my2 + ROW_H) {
-                mods.get(i).enabled = !mods.get(i).enabled;
+            Module m = mods.get(i);
+            int col = i % 2;
+            int row = i / 2;
+            int cardX = contentX + col * (colW + COL_GAP);
+            int cardY = contentY + row * (ROW_H + ROW_GAP);
+            if (mx >= cardX && mx <= cardX + colW && my >= cardY && my <= cardY + ROW_H) {
+                m.toggle();
                 return true;
             }
         }
+
         return super.mouseClicked(mx, my, button);
     }
 
     @Override
     public boolean mouseDragged(double mx, double my, int button, double dx, double dy) {
         if (dragging) {
-            guiX = (float)(mx - dragOffX);
-            guiY = (float)(my - dragOffY);
+            guiX = (float) (mx - dragOffX);
+            guiY = (float) (my - dragOffY);
             return true;
         }
         return super.mouseDragged(mx, my, button, dx, dy);
@@ -290,10 +276,10 @@ public class ClickGuiScreen extends Screen {
 
     @Override
     public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
-        if (keyCode == GLFW.GLFW_KEY_ESCAPE) {
+        if (keyCode == GLFW.GLFW_KEY_ESCAPE || keyCode == GLFW.GLFW_KEY_R) {
             close();
             return true;
         }
         return super.keyPressed(keyCode, scanCode, modifiers);
     }
-            }
+                       }
