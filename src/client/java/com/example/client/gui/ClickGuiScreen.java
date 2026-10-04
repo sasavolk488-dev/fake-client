@@ -1,3 +1,112 @@
+ else {
+                ctx.fill(tabX, tabY, tabX + tw, tabY + 18, 0xFF282830);
+                ctx.drawTextWithShadow(textRenderer, Text.literal(name),
+                        tabX + 6, tabY + 5, 0xFFD0D0D0);
+            }
+            tabX +=  + 3;
+        }
+
+        List<Mod> mods = CATEGORIES.get(selectedTab).mods;
+        int listY = y + 52;
+        int rowH = 20;
+
+        for (int i = 0; i < mods.size(); i++) {
+            Mod m = mods.get(i);
+            int my = listY + i * rowH;
+
+            float target = m.enabled ? 1f : 0f;
+            m.anim += (target - m.anim) * 0.25f;
+
+            ctx.fill(x + 8, my, x + W - 8, my + rowH - 3, 0xFF1E1E24);
+
+            int indW = (int) (3 * m.anim);
+            if (indW > 0)
+                ctx.fill(x + 8, my, x + 8 + indW, my + rowH - 3, rainbow(0, 0.1f));
+
+            ctx.drawTextWithShadow(textRenderer, Text.literal(m.name),
+                    x + 16, my + 6, m.anim > 0.5f ? 0xFFFFFFFF : 0xFFA0A0A0);
+
+            int sw = 26, sh = 10;
+            int sx = x + W - 16 - sw;
+            int sy = my + (rowH - 3 - sh) / 2;
+
+            ctx.fill(sx, sy, sx + sw, sy + sh, 0xFF3C3C46);
+            int fill = (int) ((sw - 2) * m.anim);
+            if (fill > 0)
+                ctx.fill(sx + 1, sy + 1, sx + 1 + fill, sy + sh - 1, rainbow(0, 0.1f));
+
+            int knob = sh - 2;
+            int kx = sx + 1 + (int) ((sw - 2 - knob) * m.anim);
+            ctx.fill(kx, sy + 1, kx + knob, sy + 1 + knob, 0xFFFFFFFF);
+        }
+    }
+
+    @Override
+    public boolean mouseClicked(double mx, double my, int button) {
+        if (mx >= guiX && mx <= guiX + W && my >= guiY && my <= guiY + 24) {
+            dragging = true;
+            dragOffX = (int) mx - guiX;
+            dragOffY = (int) my - guiY;
+            return true;
+        }
+
+        int tabX = guiX + 6;
+        int tabY = guiY + 28;
+        for (int i = 0; i < CATEGORIES.size(); i++) {
+            int tw = textRenderer.getWidth(CATEGORIES.get(i).name) + 12;
+            if (mx >= tabX && mx <= tabX + tw && my >= tabY && my <= tabY + 18) {
+                selectedTab = i;
+                return true;
+            }
+            tabX += tw + 3;
+        }
+
+        List<Mod> mods = CATEGORIES.get(selectedTab).mods;
+        int listY = guiY + 52;
+        int rowH = 20;
+        for (int i = 0; i < mods.size(); i++) {
+            int my2 = listY + i * rowH;
+            int sw = 26;
+            int sx = guiX + W - 16 - sw;
+            int sy = my2 + (rowH - 3 - 10) / 2;
+            if (mx >= sx && mx <= sx + sw && my >= sy && my <= sy + 10) {
+                Mod m = mods.get(i);
+                m.enabled = !m.enabled;
+                return true;
+            }
+        }
+        return super.mouseClicked(mx, my, button);
+    }
+
+    @Override
+    public boolean mouseDragged(double mx, double my, int button, double dx, double dy) {
+        if (dragging) {
+            guiX = (int) mx - dragOffX;
+            guiY = (int) my - dragOffY;
+            return true;
+        }
+        return super.mouseDragged(mx, my, button, dx, dy);
+    }
+
+    @Override
+    public boolean mouseReleased(double mx, double my, int button) {
+        dragging = false;
+        return super.mouseReleased(mx, my, button);
+    }
+
+    @Override
+    public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
+        if (keyCode == org.lwjgl.glfw.GLFW.GLFW_KEY_ESCAPE) {
+            close();
+            return true;
+        }
+        return super.keyPressed(keyCode, scanCode, modifiers);
+    }
+
+    private static int rainbow(int offset, float speed) {
+        double t = Util.getMillis() / 4000.0;
+        float hue = (float) ((t + offset * 0.08 * speed) % 1.0);
+        return Color.HSBtoRGB(hue, 0.75f, 1f) | 0xFF000000;
 package com.example.client.gui;
 
 import net.minecraft.client.gui.DrawContext;
@@ -200,6 +309,4 @@ public class ClickGuiScreen extends Screen {
     private static int rainbow(int offset, float speed) {
         double t = Util.getMillis() / 4000.0;
         float hue = (float) ((t + offset * 0.08 * speed) % 1.0);
-        return Color.HSBtoRGB(hue, 0.75f, 1f) | 0xFF000000;
-    }
-          }
+        return Color.HSBtoRGB
