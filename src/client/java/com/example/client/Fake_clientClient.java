@@ -20,7 +20,7 @@ public class Fake_clientClient implements ClientModInitializer {
         openGuiKey = KeyBindingHelper.registerKeyBinding(new KeyBinding(
                 "key.fake_client.clickgui",
                 InputUtil.Type.KEYSYM,
-                GLFW.GLFW_KEY_R,
+                GLFW.GLFW_KEY_RIGHT_SHIFT,
                 "category.fake_client"
         ));
 
