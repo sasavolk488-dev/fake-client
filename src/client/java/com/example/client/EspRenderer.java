@@ -16,6 +16,8 @@ public class EspRenderer {
     }
 
     private static void render(DrawContext ctx, RenderTickCounter tick) {
+        if (!isEspEnabled()) return;
+
         MinecraftClient mc = MinecraftClient.getInstance();
         if (mc.world == null || mc.player == null) return;
         if (mc.options.hudHidden) return;
@@ -23,15 +25,17 @@ public class EspRenderer {
         int sw = mc.getWindow().getScaledWidth();
         int sh = mc.getWindow().getScaledHeight();
 
-        // ТЕСТ: красный квадрат по центру экрана
-        ctx.fill(sw / 2 - 50, sh / 2 - 50, sw / 2 + 50, sh / 2 + 50, 0xFFFF0000);
-
-        if (!isEspEnabled()) return;
-
         Vec3d cam = mc.gameRenderer.getCamera().getPos();
         float yaw = (float) Math.toRadians(mc.gameRenderer.getCamera().getYaw());
         float pitch = (float) Math.toRadians(mc.gameRenderer.getCamera().getPitch());
         double fov = mc.options.getFov().getValue();
+
+        float cosY = (float) Math.cos(yaw);
+        float sinY = (float) Math.sin(yaw);
+        float cosP = (float) Math.cos(pitch);
+        float sinP = (float) Math.sin(pitch);
+
+        double fovRad = Math.toRadians(fov);
 
         for (Entity e : mc.world.getEntities()) {
             if (!(e instanceof PlayerEntity p)) continue;
@@ -42,15 +46,17 @@ public class EspRenderer {
             Vec3d center = new Vec3d(pos.x, pos.y + p.getHeight() / 2, pos.z);
             Vec3d rel = center.subtract(cam);
 
-            double rx = rel.x * Math.cos(-yaw) - rel.z * Math.sin(-yaw);
-            double rz = rel.x * Math.sin(-yaw) + rel.z * Math.cos(-yaw);
+            // Y rotation (yaw)
+            double rx = rel.x * cosY - rel.z * sinY;
+            double rz = rel.x * sinY + rel.z * cosY;
 
-            double ry = rel.y * Math.cos(-pitch) - rz * Math.sin(-pitch);
-            double rz2 = rel.y * Math.sin(-pitch) + rz * Math.cos(-pitch);
+            // X rotation (pitch)
+            double ry = rel.y * cosP - rz * sinP;
+            double rz2 = rel.y * sinP + rz * cosP;
 
             if (rz2 <= 0.1) continue;
 
-            double scale = sh / (2.0 * Math.tan(Math.toRadians(fov) / 2.0));
+            double scale = (sh / 2.0) / Math.tan(fovRad / 2.0);
             int sx = (int)(sw / 2.0 + rx * scale / rz2);
             int sy = (int)(sh / 2.0 - ry * scale / rz2);
 
@@ -84,4 +90,4 @@ public class EspRenderer {
         }
         return false;
     }
-          }
+                }
