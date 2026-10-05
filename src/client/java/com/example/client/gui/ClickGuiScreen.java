@@ -15,9 +15,9 @@ public class ClickGuiScreen extends Screen {
     private static final int H = 240;
     private static final int HEADER_H = 26;
     private static final int SIDEBAR_W = 85;
-    private static final int ROW_H = 20;
-    private static final int ROW_GAP = 5;
-    private static final int COL_GAP = 5;
+    private static final int ROW_H = 22;
+    private static final int ROW_GAP = 6;
+    private static final int COL_GAP = 6;
     private static final int SETTINGS_W = 220;
     private static final int SETTINGS_ROW_H = 26;
 
@@ -161,18 +161,18 @@ public class ClickGuiScreen extends Screen {
 
             int textColor = m.enabled ? 0xFFFFFFFF : 0xFFAAAAAA;
             ctx.drawTextWithShadow(textRenderer, Text.literal(m.name),
-                    cardX + 7, cardY + 6, textColor);
+                    cardX + 7, cardY + 7, textColor);
 
-            // === КНОПКА-ШЕСТЕРЁНКА ===
+            int tsw = 20;
+            int tsh = 11;
+
             if (!m.settings.isEmpty()) {
+                // === ЕСТЬ НАСТРОЙКИ: тумблер + шестерёнка ===
                 int gearSize = 14;
-                int gx = cardX + colW - gearSize - 4;
+                int gx = cardX + colW - gearSize - 5;
                 int gy = cardY + (ROW_H - gearSize) / 2;
 
-                // тумблер сдвигаем левее, чтобы не пересекался
-                int tsw = 20;
-                int tsh = 11;
-                int tx = gx - tsw - 4;
+                int tx = gx - tsw - 5;
                 int ty = cardY + (ROW_H - tsh) / 2;
 
                 ctx.fill(tx, ty, tx + tsw, ty + tsh, BG_TOGGLE_OFF);
@@ -191,17 +191,15 @@ public class ClickGuiScreen extends Screen {
                 ctx.fill(gx, gy, gx + gearSize, gy + gearSize,
                         gearHover ? GEAR_BG_HOVER : GEAR_BG);
 
-                // иконка шестерёнки (пиксельная)
                 int cxx = gx + gearSize / 2;
                 int cyy = gy + gearSize / 2;
-                ctx.fill(cxx - 1, cyy - 3, cxx + 1, cyy + 3, GEAR_ICON);
-                ctx.fill(cxx - 3, cyy - 1, cxx + 3, cyy + 1, GEAR_ICON);
-                ctx.fill(cxx - 2, cyy - 2, cxx + 2, cyy + 2, GEAR_BG);
-                ctx.fill(cxx - 1, cyy - 1, cxx + 1, cyy + 1, GEAR_ICON);
+                ctx.fill(cxx - 1, cyy - 4, cxx + 1, cyy + 4, GEAR_ICON);
+                ctx.fill(cxx - 4, cyy - 1, cxx + 4, cyy + 1, GEAR_ICON);
+                ctx.fill(cxx - 3, cyy - 3, cxx + 3, cyy + 3, GEAR_BG);
+                ctx.fill(cxx - 2, cyy - 2, cxx + 2, cyy + 2, GEAR_ICON);
+                ctx.fill(cxx - 1, cyy - 1, cxx + 1, cyy + 1, GEAR_BG);
             } else {
-                // без настроек — обычный тумблер справа
-                int tsw = 20;
-                int tsh = 11;
+                // === БЕЗ НАСТРОЕК: только тумблер ===
                 int tx = cardX + colW - tsw - 6;
                 int ty = cardY + (ROW_H - tsh) / 2;
 
@@ -310,7 +308,7 @@ public class ClickGuiScreen extends Screen {
 
     @Override
     public boolean mouseClicked(double mx, double my, int button) {
-        // === НАСТРОЙКИ ОТКРЫТЫ ===
+        // === ПАНЕЛЬ НАСТРОЕК ОТКРЫТА ===
         if (settingsModule != null) {
             Module m = settingsModule;
             int listSize = m.settings.size();
@@ -393,7 +391,7 @@ public class ClickGuiScreen extends Screen {
 
             if (mx >= cardX && mx <= cardX + colW && my >= cardY && my <= cardY + ROW_H) {
 
-                // ПКМ → тоже открываем настройки (если поддерживается)
+                // ПКМ (если работает) → сразу настройки
                 if (button == 1) {
                     if (!m.settings.isEmpty()) settingsModule = m;
                     return true;
@@ -402,15 +400,16 @@ public class ClickGuiScreen extends Screen {
                 // === ЛКМ: сначала проверяем шестерёнку ===
                 if (!m.settings.isEmpty()) {
                     int gearSize = 14;
-                    int gx = cardX + colW - gearSize - 4;
+                    int gx = cardX + colW - gearSize - 5;
                     int gy = cardY + (ROW_H - gearSize) / 2;
+
                     if (mx >= gx && mx <= gx + gearSize && my >= gy && my <= gy + gearSize) {
                         settingsModule = m;
                         return true;
                     }
                 }
 
-                // === ЛКМ по остальному → toggle ===
+                // === Иначе → toggle ===
                 m.toggle();
                 return true;
             }
@@ -447,4 +446,4 @@ public class ClickGuiScreen extends Screen {
         }
         return super.keyPressed(keyCode, scanCode, modifiers);
     }
-            }
+    }
