@@ -1,24 +1,18 @@
 package com.example.client;
 
 import com.example.client.module.ModuleManager;
-import net.fabricmc.fabric.api.client.rendering.v1.HudElementRegistry;
-import net.fabricmc.fabric.api.client.rendering.v1.VanillaHudElements;
+import net.fabricmc.fabric.api.client.rendering.v1.HudRenderCallback;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.render.RenderTickCounter;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.player.PlayerEntity;
-import net.minecraft.util.Identifier;
 import net.minecraft.util.math.Vec3d;
 
 public class EspRenderer {
 
     public static void register() {
-        HudElementRegistry.attachElementBefore(
-                VanillaHudElements.CHAT,
-                Identifier.of("fake_client", "esp_overlay"),
-                EspRenderer::render
-        );
+        HudRenderCallback.EVENT.register(EspRenderer::render);
     }
 
     private static void render(DrawContext ctx, RenderTickCounter tick) {
