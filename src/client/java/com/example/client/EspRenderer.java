@@ -11,7 +11,6 @@ import net.minecraft.client.util.math.MatrixStack;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.util.math.Box;
-import net.minecraft.util.math.Vec3d;
 import org.joml.Matrix4f;
 
 public class EspRenderer {
@@ -26,7 +25,6 @@ public class EspRenderer {
             MatrixStack matrices = context.matrixStack();
             if (matrices == null) return;
 
-            Vec3d camPos = context.camera().getPos();
             VertexConsumerProvider.Immediate consumers = mc.getBufferBuilders().getEntityVertexConsumers();
             VertexConsumer buffer = consumers.getBuffer(RenderLayer.getLines());
 
@@ -34,10 +32,7 @@ public class EspRenderer {
             RenderSystem.defaultBlendFunc();
             RenderSystem.disableDepthTest();
             RenderSystem.depthMask(false);
-            RenderSystem.lineWidth(2.0f);
-
-            matrices.push();
-            matrices.translate(-camPos.x, -camPos.y, -camPos.z);
+            RenderSystem.lineWidth(3.0f);
 
             for (Entity entity : mc.world.getEntities()) {
                 if (!(entity instanceof PlayerEntity player)) continue;
@@ -47,7 +42,6 @@ public class EspRenderer {
                 drawBox(matrices, buffer, player.getBoundingBox());
             }
 
-            matrices.pop();
             consumers.draw();
 
             RenderSystem.lineWidth(1.0f);
@@ -71,16 +65,19 @@ public class EspRenderer {
         float x1 = (float) box.minX, y1 = (float) box.minY, z1 = (float) box.minZ;
         float x2 = (float) box.maxX, y2 = (float) box.maxY, z2 = (float) box.maxZ;
 
+        // нижняя грань
         line(m, buffer, x1, y1, z1, x2, y1, z1, color);
         line(m, buffer, x2, y1, z1, x2, y1, z2, color);
         line(m, buffer, x2, y1, z2, x1, y1, z2, color);
         line(m, buffer, x1, y1, z2, x1, y1, z1, color);
 
+        // верхняя грань
         line(m, buffer, x1, y2, z1, x2, y2, z1, color);
         line(m, buffer, x2, y2, z1, x2, y2, z2, color);
         line(m, buffer, x2, y2, z2, x1, y2, z2, color);
         line(m, buffer, x1, y2, z2, x1, y2, z1, color);
 
+        // вертикальные рёбра
         line(m, buffer, x1, y1, z1, x1, y2, z1, color);
         line(m, buffer, x2, y1, z1, x2, y2, z1, color);
         line(m, buffer, x2, y1, z2, x2, y2, z2, color);
@@ -94,4 +91,4 @@ public class EspRenderer {
         buf.vertex(m, x1, y1, z1).color(color);
         buf.vertex(m, x2, y2, z2).color(color);
     }
-                                                  }
+             }
