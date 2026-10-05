@@ -47,6 +47,11 @@ public class ClickGuiScreen extends Screen {
     private long openTime;
     private Module settingsModule = null;
 
+    // === ДОЛГИЙ ТАП ===
+    private Module pressModule = null;
+    private long pressTime = 0;
+    private double pressX = 0, pressY = 0;
+
     public ClickGuiScreen() {
         super(Text.literal("ClickGUI"));
     }
@@ -67,6 +72,18 @@ public class ClickGuiScreen extends Screen {
         long elapsed = System.currentTimeMillis() - openTime;
         float t = Math.min(1f, elapsed / 180f);
         float openAnim = 1f - (1f - t) * (1f - t);
+
+        // === ПРОВЕРКА ДОЛГОГО ТАПА ===
+        if (pressModule != null) {
+            long held = System.currentTimeMillis() - pressTime;
+            double dx = mouseX - pressX;
+            double dy = mouseY - pressY;
+            double moved = Math.sqrt(dx * dx + dy * dy);
+            if (held > 500 && moved < 15 && !pressModule.settings.isEmpty()) {
+                settingsModule = pressModule;
+                pressModule = null;
+            }
+        }
 
         ctx.fill(0, 0, width, height, ((int) (0x50 * openAnim)) << 24);
 
@@ -153,16 +170,28 @@ public class ClickGuiScreen extends Screen {
             boolean hover = mouseX >= cardX && mouseX <= cardX + colW
                     && mouseY >= cardY && mouseY <= cardY + ROW_H;
 
-            ctx.fill(cardX, cardY, cardX + colW, cardY + ROW_H,
-                    hover ? BG_ROW_HOVER : BG_ROW);
+            // подсветка если долгий тап
+            boolean pressing = (pressModule == m);
+            int bg = hover ? BG_ROW_HOVER : BG_ROW;
+            if (pressing) {
+                long held = System.currentTimeMillis() - pressTime;
+                if (held > 200) bg = 0xFF44445A;
+            }
+
+            ctx.fill(cardX, cardY, cardX + colW, cardY + ROW_H, bg);
 
             int textColor = m.enabled ? 0xFFFFFFFF : 0xFFAAAAAA;
             ctx.drawTextWithShadow(textRenderer, Text.literal(m.name),
                     cardX + 7, cardY + 6, textColor);
 
+            // желтая точка если есть настройки
+            if (!m.settings.isEmpty()) {
+                ctx.fill(cardX + colW - 6, cardY + 4, cardX + colW - 3, cardY + 7, 0xFFFFAA44);
+            }
+
             int tsw = 20;
             int tsh = 11;
-            int tx = cardX + colW - tsw - 6;
+            int tx = cardX + colW - tsw - 8;
             int ty = cardY + (ROW_H - tsh) / 2;
 
             ctx.fill(tx, ty, tx + tsw, ty + tsh, BG_TOGGLE_OFF);
@@ -176,11 +205,6 @@ public class ClickGuiScreen extends Screen {
             int kx = tx + 1 + (int) ((tsw - knob - 2) * m.anim);
             int knobColor = m.anim > 0.5f ? 0xFF23232A : 0xFF888888;
             ctx.fill(kx, ty + 1, kx + knob, ty + 1 + knob, knobColor);
-
-            // точка-индикатор что у модуля есть настройки
-            if (!m.settings.isEmpty()) {
-                ctx.fill(cardX + colW - 4, cardY + 3, cardX + colW - 2, cardY + 5, 0xFFFFAA44);
-            }
         }
     }
 
@@ -276,7 +300,7 @@ public class ClickGuiScreen extends Screen {
 
     @Override
     public boolean mouseClicked(double mx, double my, int button) {
-        // ====== Если открыта панель настроек ======
+        // === НАСТРОЙКИ ОТКРЫТЫ ===
         if (settingsModule != null) {
             Module m = settingsModule;
             int listSize = m.settings.size();
@@ -285,7 +309,6 @@ public class ClickGuiScreen extends Screen {
             int px = (this.width - panelW) / 2;
             int py = (this.height - panelH) / 2;
 
-            // крестик
             int closeX = px + panelW - 20;
             int closeY = py + 7;
             if (mx >= closeX && mx <= closeX + 14 && my >= closeY && my <= closeY + 14) {
@@ -293,7 +316,6 @@ public class ClickGuiScreen extends Screen {
                 return true;
             }
 
-            // кнопки - и +
             for (int i = 0; i < listSize; i++) {
                 Module.Setting s = m.settings.get(i);
                 int ry = py + 30 + i * SETTINGS_ROW_H;
@@ -326,7 +348,7 @@ public class ClickGuiScreen extends Screen {
             return super.mouseClicked(mx, my, button);
         }
 
-        // ====== Основное окно ======
+        // === ОСНОВНОЕ ОКНО ===
         int x = (int) guiX;
         int y = (int) guiY;
 
@@ -360,19 +382,44 @@ public class ClickGuiScreen extends Screen {
             if (cardY + ROW_H > y + H - 4) break;
 
             if (mx >= cardX && mx <= cardX + colW && my >= cardY && my <= cardY + ROW_H) {
-                // ПРАВЫЙ КЛИК → открыть настройки
+
+                // ПКМ (button 1) → сразу открыть настройки
                 if (button == 1) {
                     if (!m.settings.isEmpty()) settingsModule = m;
                     return true;
                 }
 
-                // Левый клик по тумблеру/модулю → toggle
-                m.toggle();
+                // ЛКМ → запоминаем для долгого тапа
+                pressModule = m;
+                pressTime = System.currentTimeMillis();
+                pressX = mx;
+                pressY = my;
                 return true;
             }
         }
 
         return super.mouseClicked(mx, my, button);
+    }
+
+    @Override
+    public boolean mouseReleased(double mx, double my, int button) {
+        // Если был долгий тап — уже обработали в render(). Иначе — короткий клик = toggle
+        if (pressModule != null) {
+            long held = System.currentTimeMillis() - pressTime;
+            double dx = mx - pressX;
+            double dy = my - pressY;
+            double moved = Math.sqrt(dx * dx + dy * dy);
+
+            if (held < 500 && moved < 15) {
+                // короткий тап → toggle
+                pressModule.toggle();
+            }
+            // если held > 500 — уже открылись настройки в render()
+            pressModule = null;
+        }
+
+        dragging = false;
+        return super.mouseReleased(mx, my, button);
     }
 
     @Override
@@ -382,13 +429,15 @@ public class ClickGuiScreen extends Screen {
             guiY = (float) (my - dragOffY);
             return true;
         }
+        // Если тянем палец по карточке — сбрасываем press (это не долгий тап)
+        if (pressModule != null) {
+            double pdx = mx - pressX;
+            double pdy = my - pressY;
+            if (Math.sqrt(pdx * pdx + pdy * pdy) > 15) {
+                pressModule = null;
+            }
+        }
         return super.mouseDragged(mx, my, button, dx, dy);
-    }
-
-    @Override
-    public boolean mouseReleased(double mx, double my, int button) {
-        dragging = false;
-        return super.mouseReleased(mx, my, button);
     }
 
     @Override
@@ -403,4 +452,4 @@ public class ClickGuiScreen extends Screen {
         }
         return super.keyPressed(keyCode, scanCode, modifiers);
     }
-            }
+        }
