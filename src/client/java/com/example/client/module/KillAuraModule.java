@@ -10,16 +10,20 @@ import java.util.Random;
 
 public class KillAuraModule extends Module {
 
-    public static float range = 3.0f;
-    public static int minCps = 8;
-    public static int maxCps = 14;
-    public static float rotationSpeed = 25.0f;
+    public final Setting rangeSet;
+    public final Setting minCpsSet;
+    public final Setting maxCpsSet;
+    public final Setting rotSpeedSet;
 
     private long lastAttack = 0;
     private final Random random = new Random();
 
     public KillAuraModule() {
         super("KillAura", "Автоатака ближайшего игрока", "Combat", false);
+        rangeSet = num("Range", 3.0f, 1.0f, 6.0f, 0.1f);
+        minCpsSet = num("Min CPS", 8f, 4f, 20f, 1f);
+        maxCpsSet = num("Max CPS", 14f, 4f, 20f, 1f);
+        rotSpeedSet = num("Rot Speed", 25f, 5f, 90f, 5f);
     }
 
     @Override
@@ -27,6 +31,11 @@ public class KillAuraModule extends Module {
         MinecraftClient mc = MinecraftClient.getInstance();
         if (mc.player == null || mc.world == null) return;
         if (mc.currentScreen != null) return;
+
+        float range = rangeSet.value;
+        int minCps = (int) minCpsSet.value;
+        int maxCps = (int) maxCpsSet.value;
+        float rotSpeed = rotSpeedSet.value;
 
         PlayerEntity target = null;
         double bestDist = range * range;
@@ -61,8 +70,8 @@ public class KillAuraModule extends Module {
         float yawDiff = wrapDegrees(targetYaw - currentYaw);
         float pitchDiff = wrapDegrees(targetPitch - currentPitch);
 
-        float newYaw = currentYaw + clamp(yawDiff, -rotationSpeed, rotationSpeed);
-        float newPitch = currentPitch + clamp(pitchDiff, -rotationSpeed, rotationSpeed);
+        float newYaw = currentYaw + clamp(yawDiff, -rotSpeed, rotSpeed);
+        float newPitch = currentPitch + clamp(pitchDiff, -rotSpeed, rotSpeed);
 
         mc.player.setYaw(newYaw);
         mc.player.setPitch(newPitch);
@@ -97,4 +106,4 @@ public class KillAuraModule extends Module {
         if (value > max) return max;
         return value;
     }
-                }
+            }
