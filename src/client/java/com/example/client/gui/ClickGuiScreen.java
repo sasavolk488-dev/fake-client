@@ -7,38 +7,40 @@ import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.text.Text;
 import org.lwjgl.glfw.GLFW;
 
-import java.awt.Color;
 import java.util.List;
 
 public class ClickGuiScreen extends Screen {
 
-    // === РАЗМЕРЫ ===
-    private static final int W = 400;
-    private static final int H = 250;
-    private static final int HEADER_H = 26;
-    private static final int SIDEBAR_W = 90;
-    private static final int ROW_H = 22;
-    private static final int ROW_GAP = 5;
-    private static final int COL_GAP = 5;
+    // === GHOST STYLE COLORS ===
+    private static final int COLOR_BG          = 0xE00A0A0C;
+    private static final int COLOR_BG_HEADER   = 0xF0141418;
+    private static final int COLOR_BG_SIDEBAR  = 0xF00F0F12;
+    private static final int COLOR_ACCENT      = 0xFF4FC3F7;
+    private static final int COLOR_TEXT        = 0xFFFFFFFF;
+    private static final int COLOR_TEXT_DIM    = 0xFF888888;
+    private static final int COLOR_CARD        = 0xE01A1A1E;
+    private static final int COLOR_CARD_HOVER  = 0xE026262C;
+    private static final int COLOR_TOGGLE_OFF  = 0xFF2A2A2E;
+    private static final int COLOR_GEAR        = 0xFF333338;
+    private static final int COLOR_BORDER      = 0xFF2A2A2E;
+
+    // === SETTINGS PANEL COLORS ===
+    private static final int BG_SETTINGS       = 0xF0141418;
+    private static final int BG_SETTINGS_HD    = 0xFF0F0F12;
+    private static final int BG_BTN            = 0xFF2E2E36;
+    private static final int BG_BTN_HOVER      = 0xFF3E3E48;
+    private static final int BG_SETTING_ROW    = 0xFF1E1E22;
+
+    // === SIZES ===
+    private static final int W = 420;
+    private static final int H = 260;
+    private static final int HEADER_H = 30;
+    private static final int SIDEBAR_W = 100;
+    private static final int ROW_H = 24;
+    private static final int ROW_GAP = 6;
+    private static final int COL_GAP = 6;
     private static final int SETTINGS_W = 220;
     private static final int SETTINGS_ROW_H = 26;
-
-    // === ЦВЕТА ===
-    private static final int BG_MAIN       = 0xF0141418;
-    private static final int BG_HEADER     = 0xFF0F0F12;
-    private static final int BG_SIDEBAR    = 0xFF101013;
-    private static final int BG_ROW        = 0xFF1E1E22;
-    private static final int BG_ROW_HOVER  = 0xFF28282E;
-    private static final int BG_CAT_ACTIVE = 0xFF2A2A30;
-    private static final int BG_CAT_HOVER  = 0xFF1C1C20;
-    private static final int BG_TOGGLE_OFF = 0xFF3A3A42;
-    private static final int BG_SETTINGS   = 0xFF141418;
-    private static final int BG_SETTINGS_HD= 0xFF0F0F12;
-    private static final int BG_BTN        = 0xFF2E2E36;
-    private static final int BG_BTN_HOVER  = 0xFF3E3E48;
-    private static final int GEAR_BG       = 0xFF3A3A42;
-    private static final int GEAR_BG_HOVER = 0xFF5A5A68;
-    private static final int GEAR_ICON     = 0xFFFFAA44;
 
     private float guiX = 0;
     private float guiY = 0;
@@ -73,16 +75,13 @@ public class ClickGuiScreen extends Screen {
         float t = Math.min(1f, elapsed / 200f);
         float openAnim = 1f - (1f - t) * (1f - t);
 
-        // Затемнение фона
-        ctx.fill(0, 0, width, height, ((int) (0x60 * openAnim)) << 24);
+        ctx.fill(0, 0, width, height, ((int) (0x70 * openAnim)) << 24);
 
-        // Анимация тумблеров
         for (Module m : ModuleManager.modules) {
             float target = m.enabled ? 1f : 0f;
-            m.anim += (target - m.anim) * 0.25f;
+            m.anim += (target - m.anim) * 0.2f;
         }
 
-        // Масштабирование при открытии
         float scale = 0.95f + 0.05f * openAnim;
         int cx = (int) guiX + W / 2;
         int cy = (int) guiY + H / 2;
@@ -102,63 +101,44 @@ public class ClickGuiScreen extends Screen {
         int x = (int) guiX;
         int y = (int) guiY;
 
-        // Тень окна
-        ctx.fill(x + 4, y + 5, x + W + 4, y + H + 5, 0x60000000);
+        ctx.fill(x + 6, y + 6, x + W + 6, y + H + 6, 0x60000000);
+        ctx.fill(x, y, x + W, y + H, COLOR_BG);
+        ctx.fill(x, y, x + W, y + HEADER_H, COLOR_BG_HEADER);
+        ctx.fill(x, y, x + W, y + 1, COLOR_ACCENT);
+        ctx.fill(x, y + HEADER_H, x + W, y + HEADER_H + 1, COLOR_BORDER);
 
-        // Основное окно
-        ctx.fill(x, y, x + W, y + H, BG_MAIN);
+        drawStar(ctx, x + 12, y + 12, COLOR_ACCENT);
 
-        // Шапка
-        ctx.fill(x, y, x + W, y + HEADER_H, BG_HEADER);
+        ctx.drawTextWithShadow(textRenderer, Text.literal("Client"), x + 28, y + 12, COLOR_TEXT_DIM);
+        ctx.drawTextWithShadow(textRenderer, Text.literal(" / "), x + 60, y + 12, 0xFF444448);
+        ctx.drawTextWithShadow(textRenderer, Text.literal(CATS[selectedCategory]), x + 72, y + 12, COLOR_TEXT);
 
-        // Радужная полоска сверху
-        for (int i = 0; i < W; i++) {
-            float hue = ((System.currentTimeMillis() % 4000L) / 4000f + i * 0.004f) % 1f;
-            int col = Color.HSBtoRGB(hue, 0.65f, 1f) | 0xFF000000;
-            ctx.fill(x + i, y, x + i + 1, y + 2, col);
-        }
+        int sw = 100;
+        int sx = x + W - sw - 10;
+        ctx.fill(sx, y + 8, sx + sw, y + 22, 0xFF232326);
+        ctx.drawTextWithShadow(textRenderer, Text.literal("Search..."), sx + 8, y + 11, 0xFF555558);
 
-        // Логотип (звезда)
-        drawStar(ctx, x + 9, y + 9, 0xFFFFFFFF);
+        ctx.fill(x, y + HEADER_H, x + SIDEBAR_W, y + H, COLOR_BG_SIDEBAR);
+        ctx.fill(x + SIDEBAR_W, y + HEADER_H, x + SIDEBAR_W + 1, y + H, COLOR_BORDER);
 
-        // Навигация
-        ctx.drawTextWithShadow(textRenderer, Text.literal("Client"), x + 24, y + 9, 0xFF888888);
-        ctx.drawTextWithShadow(textRenderer, Text.literal(" / "), x + 56, y + 9, 0xFF3A3A42);
-        ctx.drawTextWithShadow(textRenderer, Text.literal(CATS[selectedCategory]), x + 68, y + 9, 0xFFFFFFFF);
-
-        // Поиск
-        int sw = 90;
-        int sx = x + W - sw - 8;
-        ctx.fill(sx, y + 6, sx + sw, y + 20, 0xFF1E1E22);
-        ctx.drawTextWithShadow(textRenderer, Text.literal("Search..."), sx + 6, y + 9, 0xFF55555E);
-
-        // Сайдбар
-        ctx.fill(x, y + HEADER_H, x + SIDEBAR_W, y + H, BG_SIDEBAR);
-        ctx.fill(x + SIDEBAR_W, y + HEADER_H, x + SIDEBAR_W + 1, y + H, 0xFF2A2A30);
-
-        // Категории
         for (int i = 0; i < CATS.length; i++) {
-            int cy2 = y + HEADER_H + 10 + i * 26;
-            boolean hover = mouseX >= x + 4 && mouseX <= x + SIDEBAR_W - 4 && mouseY >= cy2 && mouseY <= cy2 + 22;
+            int cy2 = y + HEADER_H + 14 + i * 28;
+            boolean hover = mouseX >= x + 6 && mouseX <= x + SIDEBAR_W - 6 && mouseY >= cy2 && mouseY <= cy2 + 22;
 
             if (i == selectedCategory) {
-                ctx.fill(x + 4, cy2, x + SIDEBAR_W - 4, cy2 + 22, BG_CAT_ACTIVE);
-                ctx.fill(x + 4, cy2, x + 6, cy2 + 22, 0xFFFFFFFF);
+                ctx.fill(x + 6, cy2, x + SIDEBAR_W - 6, cy2 + 22, 0xFF1E1E22);
+                ctx.fill(x + 6, cy2, x + 9, cy2 + 22, COLOR_ACCENT);
             } else if (hover) {
-                ctx.fill(x + 4, cy2, x + SIDEBAR_W - 4, cy2 + 22, BG_CAT_HOVER);
+                ctx.fill(x + 6, cy2, x + SIDEBAR_W - 6, cy2 + 22, 0xFF1A1A1E);
             }
 
-            int dotColor = i == selectedCategory ? 0xFFFFFFFF : 0xFF5A5A62;
-            ctx.fill(x + 11, cy2 + 8, x + 15, cy2 + 12, dotColor);
-
-            int textColor = i == selectedCategory ? 0xFFFFFFFF : 0xFF9A9AA2;
-            ctx.drawTextWithShadow(textRenderer, Text.literal(CATS[i]), x + 22, cy2 + 6, textColor);
+            int textColor = i == selectedCategory ? COLOR_TEXT : COLOR_TEXT_DIM;
+            ctx.drawTextWithShadow(textRenderer, Text.literal(CATS[i]), x + 20, cy2 + 7, textColor);
         }
 
-        // Сетка модулей
-        int contentX = x + SIDEBAR_W + 10;
-        int contentY = y + HEADER_H + 8;
-        int contentW = W - SIDEBAR_W - 20;
+        int contentX = x + SIDEBAR_W + 12;
+        int contentY = y + HEADER_H + 12;
+        int contentW = W - SIDEBAR_W - 24;
         int colW = (contentW - COL_GAP) / 2;
 
         List<Module> mods = ModuleManager.byCategory(CATS[selectedCategory]);
@@ -171,61 +151,55 @@ public class ClickGuiScreen extends Screen {
             int cardX = contentX + col * (colW + COL_GAP);
             int cardY = contentY + row * (ROW_H + ROW_GAP);
 
-            if (cardY + ROW_H > y + H - 4) break;
+            if (cardY + ROW_H > y + H - 12) break;
 
             boolean hover = mouseX >= cardX && mouseX <= cardX + colW && mouseY >= cardY && mouseY <= cardY + ROW_H;
 
-            ctx.fill(cardX, cardY, cardX + colW, cardY + ROW_H, hover ? BG_ROW_HOVER : BG_ROW);
+            ctx.fill(cardX, cardY, cardX + colW, cardY + ROW_H, hover ? COLOR_CARD_HOVER : COLOR_CARD);
 
-            int textColor = m.enabled ? 0xFFFFFFFF : 0xFFAAAAAA;
-            ctx.drawTextWithShadow(textRenderer, Text.literal(m.name), cardX + 7, cardY + 6, textColor);
+            int textColor = m.enabled ? COLOR_TEXT : COLOR_TEXT_DIM;
+            ctx.drawTextWithShadow(textRenderer, Text.literal(m.name), cardX + 10, cardY + 8, textColor);
 
-            int tsw = 20;
-            int tsh = 11;
+            int tsw = 24;
+            int tsh = 12;
 
             if (!m.settings.isEmpty()) {
-                // Тумблер + шестерёнка
                 int gearSize = 14;
-                int gx = cardX + colW - gearSize - 5;
+                int gx = cardX + colW - gearSize - 6;
                 int gy = cardY + (ROW_H - gearSize) / 2;
 
                 int tx = gx - tsw - 5;
                 int ty = cardY + (ROW_H - tsh) / 2;
 
-                ctx.fill(tx, ty, tx + tsw, ty + tsh, BG_TOGGLE_OFF);
+                ctx.fill(tx, ty, tx + tsw, ty + tsh, COLOR_TOGGLE_OFF);
                 if (m.anim > 0.01f) {
                     int fillW = Math.max(1, (int) (tsw * m.anim));
-                    ctx.fill(tx, ty, tx + fillW, ty + tsh, 0xFFFFFFFF);
+                    ctx.fill(tx, ty, tx + fillW, ty + tsh, COLOR_ACCENT);
                 }
                 int knob = tsh - 3;
                 int kx = tx + 1 + (int) ((tsw - knob - 2) * m.anim);
-                int knobColor = m.anim > 0.5f ? 0xFF23232A : 0xFF888888;
-                ctx.fill(kx, ty + 1, kx + knob, ty + 1 + knob, knobColor);
+                ctx.fill(kx, ty + 1, kx + knob, ty + 1 + knob, COLOR_TEXT);
 
                 boolean gearHover = mouseX >= gx && mouseX <= gx + gearSize && mouseY >= gy && mouseY <= gy + gearSize;
-                ctx.fill(gx, gy, gx + gearSize, gy + gearSize, gearHover ? GEAR_BG_HOVER : GEAR_BG);
+                ctx.fill(gx, gy, gx + gearSize, gy + gearSize, gearHover ? COLOR_ACCENT : COLOR_GEAR);
 
                 int cxx = gx + gearSize / 2;
                 int cyy = gy + gearSize / 2;
-                ctx.fill(cxx - 1, cyy - 4, cxx + 1, cyy + 4, GEAR_ICON);
-                ctx.fill(cxx - 4, cyy - 1, cxx + 4, cyy + 1, GEAR_ICON);
-                ctx.fill(cxx - 3, cyy - 3, cxx + 3, cyy + 3, GEAR_BG);
-                ctx.fill(cxx - 2, cyy - 2, cxx + 2, cyy + 2, GEAR_ICON);
-                ctx.fill(cxx - 1, cyy - 1, cxx + 1, cyy + 1, GEAR_BG);
+                ctx.fill(cxx - 1, cyy - 3, cxx + 1, cyy + 3, COLOR_TEXT);
+                ctx.fill(cxx - 3, cyy - 1, cxx + 3, cyy + 1, COLOR_TEXT);
+                ctx.fill(cxx - 1, cyy - 1, cxx + 1, cyy + 1, COLOR_GEAR);
             } else {
-                // Только тумблер
                 int tx = cardX + colW - tsw - 6;
                 int ty = cardY + (ROW_H - tsh) / 2;
 
-                ctx.fill(tx, ty, tx + tsw, ty + tsh, BG_TOGGLE_OFF);
+                ctx.fill(tx, ty, tx + tsw, ty + tsh, COLOR_TOGGLE_OFF);
                 if (m.anim > 0.01f) {
                     int fillW = Math.max(1, (int) (tsw * m.anim));
-                    ctx.fill(tx, ty, tx + fillW, ty + tsh, 0xFFFFFFFF);
+                    ctx.fill(tx, ty, tx + fillW, ty + tsh, COLOR_ACCENT);
                 }
                 int knob = tsh - 3;
                 int kx = tx + 1 + (int) ((tsw - knob - 2) * m.anim);
-                int knobColor = m.anim > 0.5f ? 0xFF23232A : 0xFF888888;
-                ctx.fill(kx, ty + 1, kx + knob, ty + 1 + knob, knobColor);
+                ctx.fill(kx, ty + 1, kx + knob, ty + 1 + knob, COLOR_TEXT);
             }
         }
     }
@@ -242,12 +216,7 @@ public class ClickGuiScreen extends Screen {
         ctx.fill(px + 4, py + 6, px + panelW + 4, py + panelH + 6, 0x80000000);
         ctx.fill(px, py, px + panelW, py + panelH, BG_SETTINGS);
         ctx.fill(px, py, px + panelW, py + 26, BG_SETTINGS_HD);
-
-        for (int i = 0; i < panelW; i++) {
-            float hue = ((System.currentTimeMillis() % 4000L) / 4000f + i * 0.004f) % 1f;
-            int col = Color.HSBtoRGB(hue, 0.6f, 1f) | 0xFF000000;
-            ctx.fill(px + i, py, px + i + 1, py + 2, col);
-        }
+        ctx.fill(px, py, px + panelW, py + 1, COLOR_ACCENT);
 
         ctx.drawTextWithShadow(textRenderer, Text.literal(m.name), px + 10, py + 9, 0xFFFFFFFF);
 
@@ -261,7 +230,7 @@ public class ClickGuiScreen extends Screen {
             Module.Setting s = m.settings.get(i);
             int ry = py + 30 + i * SETTINGS_ROW_H;
 
-            ctx.fill(px + 6, ry, px + panelW - 6, ry + SETTINGS_ROW_H - 4, 0xFF2A2A32);
+            ctx.fill(px + 6, ry, px + panelW - 6, ry + SETTINGS_ROW_H - 4, BG_SETTING_ROW);
             ctx.drawTextWithShadow(textRenderer, Text.literal(s.name), px + 14, ry + 8, 0xFFDDDDEE);
 
             if (s.isBool) {
@@ -269,7 +238,7 @@ public class ClickGuiScreen extends Screen {
                 int bx = px + panelW - bw - 14;
                 int by = ry + (SETTINGS_ROW_H - 4 - bh) / 2;
 
-                ctx.fill(bx, by, bx + bw, by + bh, s.boolValue ? 0xFF44AA44 : 0xFF3A3A42);
+                ctx.fill(bx, by, bx + bw, by + bh, s.boolValue ? COLOR_ACCENT : 0xFF3A3A42);
                 if (s.boolValue) {
                     ctx.fill(bx + bw - bh + 2, by + 2, bx + bw - 2, by + bh - 2, 0xFFFFFFFF);
                 } else {
@@ -364,16 +333,16 @@ public class ClickGuiScreen extends Screen {
         }
 
         for (int i = 0; i < CATS.length; i++) {
-            int cy2 = y + HEADER_H + 10 + i * 26;
-            if (mx >= x + 4 && mx <= x + SIDEBAR_W - 4 && my >= cy2 && my <= cy2 + 22) {
+            int cy2 = y + HEADER_H + 14 + i * 28;
+            if (mx >= x + 6 && mx <= x + SIDEBAR_W - 6 && my >= cy2 && my <= cy2 + 22) {
                 selectedCategory = i;
                 return true;
             }
         }
 
-        int contentX = x + SIDEBAR_W + 10;
-        int contentY = y + HEADER_H + 8;
-        int contentW = W - SIDEBAR_W - 20;
+        int contentX = x + SIDEBAR_W + 12;
+        int contentY = y + HEADER_H + 12;
+        int contentW = W - SIDEBAR_W - 24;
         int colW = (contentW - COL_GAP) / 2;
         List<Module> mods = ModuleManager.byCategory(CATS[selectedCategory]);
 
@@ -383,7 +352,7 @@ public class ClickGuiScreen extends Screen {
             int row = i / 2;
             int cardX = contentX + col * (colW + COL_GAP);
             int cardY = contentY + row * (ROW_H + ROW_GAP);
-            if (cardY + ROW_H > y + H - 4) break;
+            if (cardY + ROW_H > y + H - 12) break;
 
             if (mx >= cardX && mx <= cardX + colW && my >= cardY && my <= cardY + ROW_H) {
                 if (button == 1) {
@@ -393,7 +362,7 @@ public class ClickGuiScreen extends Screen {
 
                 if (!m.settings.isEmpty()) {
                     int gearSize = 14;
-                    int gx = cardX + colW - gearSize - 5;
+                    int gx = cardX + colW - gearSize - 6;
                     int gy = cardY + (ROW_H - gearSize) / 2;
                     if (mx >= gx && mx <= gx + gearSize && my >= gy && my <= gy + gearSize) {
                         settingsModule = m;
