@@ -18,6 +18,8 @@ public class ClickGuiScreen extends Screen {
     private static final int ROW_H = 20;
     private static final int ROW_GAP = 5;
     private static final int COL_GAP = 5;
+    private static final int SETTINGS_W = 220;
+    private static final int SETTINGS_ROW_H = 26;
 
     private static final int BG_MAIN       = 0xFF23232A;
     private static final int BG_HEADER     = 0xFF1B1B20;
@@ -28,6 +30,10 @@ public class ClickGuiScreen extends Screen {
     private static final int BG_CAT_ACTIVE = 0xFF26262E;
     private static final int BG_CAT_HOVER  = 0xFF1F1F26;
     private static final int BG_TOGGLE_OFF = 0xFF3A3A42;
+    private static final int BG_SETTINGS   = 0xFF1E1E26;
+    private static final int BG_SETTINGS_HD = 0xFF15151A;
+    private static final int BG_BTN        = 0xFF2E2E3A;
+    private static final int BG_BTN_HOVER  = 0xFF3E3E4A;
 
     private float guiX = 0;
     private float guiY = 0;
@@ -39,6 +45,7 @@ public class ClickGuiScreen extends Screen {
     private double dragOffX, dragOffY;
 
     private long openTime;
+    private Module settingsModule = null;
 
     public ClickGuiScreen() {
         super(Text.literal("ClickGUI"));
@@ -51,10 +58,6 @@ public class ClickGuiScreen extends Screen {
     protected void init() {
         super.init();
         openTime = System.currentTimeMillis();
-        centerGui();
-    }
-
-    private void centerGui() {
         guiX = (this.width - W) / 2f;
         guiY = (this.height - H) / 2f;
     }
@@ -82,6 +85,7 @@ public class ClickGuiScreen extends Screen {
         ctx.getMatrices().translate(-cx, -cy, 0);
 
         drawWindow(ctx, mouseX, mouseY);
+        if (settingsModule != null) drawSettingsPanel(ctx, mouseX, mouseY);
 
         ctx.getMatrices().pop();
     }
@@ -172,6 +176,95 @@ public class ClickGuiScreen extends Screen {
             int kx = tx + 1 + (int) ((tsw - knob - 2) * m.anim);
             int knobColor = m.anim > 0.5f ? 0xFF23232A : 0xFF888888;
             ctx.fill(kx, ty + 1, kx + knob, ty + 1 + knob, knobColor);
+
+            // точка-индикатор что у модуля есть настройки
+            if (!m.settings.isEmpty()) {
+                ctx.fill(cardX + colW - 4, cardY + 3, cardX + colW - 2, cardY + 5, 0xFFFFAA44);
+            }
+        }
+    }
+
+    private void drawSettingsPanel(DrawContext ctx, int mouseX, int mouseY) {
+        Module m = settingsModule;
+        int listSize = m.settings.size();
+        int panelW = SETTINGS_W;
+        int panelH = 26 + listSize * SETTINGS_ROW_H + 8;
+
+        int px = (this.width - panelW) / 2;
+        int py = (this.height - panelH) / 2;
+
+        ctx.fill(px + 4, py + 6, px + panelW + 4, py + panelH + 6, 0x80000000);
+        ctx.fill(px, py, px + panelW, py + panelH, BG_SETTINGS);
+        ctx.fill(px, py, px + panelW, py + 26, BG_SETTINGS_HD);
+
+        for (int i = 0; i < panelW; i++) {
+            float hue = ((System.currentTimeMillis() % 4000L) / 4000f + i * 0.004f) % 1f;
+            int col = java.awt.Color.HSBtoRGB(hue, 0.6f, 1f) | 0xFF000000;
+            ctx.fill(px + i, py, px + i + 1, py + 2, col);
+        }
+
+        ctx.drawTextWithShadow(textRenderer, Text.literal(m.name),
+                px + 10, py + 9, 0xFFFFFFFF);
+
+        int closeX = px + panelW - 20;
+        int closeY = py + 7;
+        boolean closeHover = mouseX >= closeX && mouseX <= closeX + 14
+                && mouseY >= closeY && mouseY <= closeY + 14;
+        ctx.fill(closeX, closeY, closeX + 14, closeY + 14,
+                closeHover ? 0xFFAA3333 : 0xFF333338);
+        ctx.drawTextWithShadow(textRenderer, Text.literal("X"),
+                closeX + 4, closeY + 3, 0xFFFFFFFF);
+
+        for (int i = 0; i < listSize; i++) {
+            Module.Setting s = m.settings.get(i);
+            int ry = py + 30 + i * SETTINGS_ROW_H;
+
+            ctx.fill(px + 6, ry, px + panelW - 6, ry + SETTINGS_ROW_H - 4, 0xFF2A2A32);
+
+            ctx.drawTextWithShadow(textRenderer, Text.literal(s.name),
+                    px + 14, ry + 8, 0xFFDDDDEE);
+
+            if (s.isBool) {
+                int bw = 30, bh = 14;
+                int bx = px + panelW - bw - 14;
+                int by = ry + (SETTINGS_ROW_H - 4 - bh) / 2;
+
+                ctx.fill(bx, by, bx + bw, by + bh,
+                        s.boolValue ? 0xFF44AA44 : 0xFF3A3A42);
+
+                if (s.boolValue) {
+                    ctx.fill(bx + bw - bh + 2, by + 2, bx + bw - 2, by + bh - 2, 0xFFFFFFFF);
+                } else {
+                    ctx.fill(bx + 2, by + 2, bx + bh - 2, by + bh - 2, 0xFFFFFFFF);
+                }
+            } else {
+                int btnSize = 16;
+                int plusX = px + panelW - 14 - btnSize;
+                int minusX = plusX - btnSize - 40;
+                int valueX = minusX + btnSize + 4;
+                int by = ry + (SETTINGS_ROW_H - 4 - btnSize) / 2;
+
+                boolean minusHover = mouseX >= minusX && mouseX <= minusX + btnSize
+                        && mouseY >= by && mouseY <= by + btnSize;
+                boolean plusHover = mouseX >= plusX && mouseX <= plusX + btnSize
+                        && mouseY >= by && mouseY <= by + btnSize;
+
+                ctx.fill(minusX, by, minusX + btnSize, by + btnSize,
+                        minusHover ? BG_BTN_HOVER : BG_BTN);
+                ctx.drawTextWithShadow(textRenderer, Text.literal("-"),
+                        minusX + 6, by + 4, 0xFFFFFFFF);
+
+                String val = (s.step >= 1f) ? String.valueOf((int) s.value)
+                        : String.format("%.1f", s.value);
+                int vw = textRenderer.getWidth(val);
+                ctx.drawTextWithShadow(textRenderer, Text.literal(val),
+                        valueX + (40 - vw) / 2, by + 4, 0xFFFFFFFF);
+
+                ctx.fill(plusX, by, plusX + btnSize, by + btnSize,
+                        plusHover ? BG_BTN_HOVER : BG_BTN);
+                ctx.drawTextWithShadow(textRenderer, Text.literal("+"),
+                        plusX + 5, by + 4, 0xFFFFFFFF);
+            }
         }
     }
 
@@ -183,6 +276,57 @@ public class ClickGuiScreen extends Screen {
 
     @Override
     public boolean mouseClicked(double mx, double my, int button) {
+        // ====== Если открыта панель настроек ======
+        if (settingsModule != null) {
+            Module m = settingsModule;
+            int listSize = m.settings.size();
+            int panelW = SETTINGS_W;
+            int panelH = 26 + listSize * SETTINGS_ROW_H + 8;
+            int px = (this.width - panelW) / 2;
+            int py = (this.height - panelH) / 2;
+
+            // крестик
+            int closeX = px + panelW - 20;
+            int closeY = py + 7;
+            if (mx >= closeX && mx <= closeX + 14 && my >= closeY && my <= closeY + 14) {
+                settingsModule = null;
+                return true;
+            }
+
+            // кнопки - и +
+            for (int i = 0; i < listSize; i++) {
+                Module.Setting s = m.settings.get(i);
+                int ry = py + 30 + i * SETTINGS_ROW_H;
+
+                if (s.isBool) {
+                    int bw = 30, bh = 14;
+                    int bx = px + panelW - bw - 14;
+                    int by = ry + (SETTINGS_ROW_H - 4 - bh) / 2;
+                    if (mx >= bx && mx <= bx + bw && my >= by && my <= by + bh) {
+                        s.inc();
+                        return true;
+                    }
+                } else {
+                    int btnSize = 16;
+                    int plusX = px + panelW - 14 - btnSize;
+                    int minusX = plusX - btnSize - 40;
+                    int by = ry + (SETTINGS_ROW_H - 4 - btnSize) / 2;
+
+                    if (mx >= minusX && mx <= minusX + btnSize && my >= by && my <= by + btnSize) {
+                        s.dec();
+                        return true;
+                    }
+                    if (mx >= plusX && mx <= plusX + btnSize && my >= by && my <= by + btnSize) {
+                        s.inc();
+                        return true;
+                    }
+                }
+            }
+
+            return super.mouseClicked(mx, my, button);
+        }
+
+        // ====== Основное окно ======
         int x = (int) guiX;
         int y = (int) guiY;
 
@@ -206,13 +350,23 @@ public class ClickGuiScreen extends Screen {
         int contentW = W - SIDEBAR_W - 16;
         int colW = (contentW - COL_GAP) / 2;
         List<Module> mods = ModuleManager.byCategory(CATS[selectedCategory]);
+
         for (int i = 0; i < mods.size(); i++) {
             Module m = mods.get(i);
             int col = i % 2;
             int row = i / 2;
             int cardX = contentX + col * (colW + COL_GAP);
             int cardY = contentY + row * (ROW_H + ROW_GAP);
+            if (cardY + ROW_H > y + H - 4) break;
+
             if (mx >= cardX && mx <= cardX + colW && my >= cardY && my <= cardY + ROW_H) {
+                // ПРАВЫЙ КЛИК → открыть настройки
+                if (button == 1) {
+                    if (!m.settings.isEmpty()) settingsModule = m;
+                    return true;
+                }
+
+                // Левый клик по тумблеру/модулю → toggle
                 m.toggle();
                 return true;
             }
@@ -239,10 +393,14 @@ public class ClickGuiScreen extends Screen {
 
     @Override
     public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
-        if (keyCode == GLFW.GLFW_KEY_ESCAPE || keyCode == GLFW.GLFW_KEY_R) {
+        if (keyCode == GLFW.GLFW_KEY_ESCAPE) {
+            if (settingsModule != null) {
+                settingsModule = null;
+                return true;
+            }
             close();
             return true;
         }
         return super.keyPressed(keyCode, scanCode, modifiers);
     }
-                }
+            }
