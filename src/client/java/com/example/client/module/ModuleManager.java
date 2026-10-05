@@ -16,22 +16,26 @@ public class ModuleManager {
     public static void init() {
         modules.clear();
 
-        modules.add(new Module("KillAura", "Автонаведение", "Combat", false));
+        // COMBAT
+        modules.add(new KillAuraModule());
         modules.add(new Module("AutoClicker", "Автокликер", "Combat", false));
         modules.add(new Module("Reach", "Дистанция", "Combat", false));
         modules.add(new Module("Velocity", "Анти-отброс", "Combat", false));
         modules.add(new Module("Criticals", "Криты", "Combat", false));
 
+        // MOVEMENT
         modules.add(new AutoSprintModule());
         modules.add(new FlyModule());
         modules.add(new SpeedModule());
         modules.add(new NoFallModule());
 
+        // RENDER
         modules.add(new EspModule());
         modules.add(new FullbrightModule());
         modules.add(new Module("Tracers", "Линии", "Render", false));
         modules.add(new Module("Xray", "Прозрачные блоки", "Render", false));
 
+        // MISC
         modules.add(new Module("Hud", "HUD", "Misc", true));
         modules.add(new Module("AntiAFK", "Анти-AFK", "Misc", false));
         modules.add(new Module("NameProtect", "Скрыть ник", "Misc", false));
@@ -41,6 +45,7 @@ public class ModuleManager {
         for (Module m : modules) {
             if (m.enabled) {
                 try {
+                    if (m instanceof KillAuraModule) ((KillAuraModule) m).onTick();
                     if (m instanceof AutoSprintModule) ((AutoSprintModule) m).onTick();
                     if (m instanceof FlyModule) ((FlyModule) m).onTick();
                     if (m instanceof SpeedModule) ((SpeedModule) m).onTick();
