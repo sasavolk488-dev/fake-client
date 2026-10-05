@@ -27,7 +27,7 @@ public class EspRenderer {
 
         Vec3d cam = mc.gameRenderer.getCamera().getPos();
         float yaw = (float) Math.toRadians(mc.gameRenderer.getCamera().getYaw());
-        float pitch = (float) Math.toRadians(mc.gameRenderer.getCamera().getPitch());
+        float pitch = (float) -Math.toRadians(mc.gameRenderer.getCamera().getPitch());
         double fov = mc.options.getFov().getValue();
 
         float cosY = (float) Math.cos(yaw);
@@ -90,4 +90,4 @@ public class EspRenderer {
         }
         return false;
     }
-            }
+                      }
