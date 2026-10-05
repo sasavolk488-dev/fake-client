@@ -46,8 +46,8 @@ public class EspRenderer {
             Vec3d center = new Vec3d(pos.x, pos.y + p.getHeight() / 2, pos.z);
             Vec3d rel = center.subtract(cam);
 
-            // Yaw rotation (правильная формула для Minecraft)
-            double rx = rel.x * cosY + rel.z * sinY;
+            // Yaw rotation
+            double rx = -(rel.x * cosY + rel.z * sinY);
             double rz = -rel.x * sinY + rel.z * cosY;
 
             // Pitch rotation
@@ -90,4 +90,4 @@ public class EspRenderer {
         }
         return false;
     }
-    }
+            }
