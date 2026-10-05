@@ -1,6 +1,7 @@
 package com.example.client;
 
 import com.example.client.gui.ClickGuiScreen;
+import com.example.client.module.ModuleManager;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.fabricmc.fabric.api.client.keybinding.v1.KeyBindingHelper;
@@ -14,10 +15,12 @@ public class Fake_clientClient implements ClientModInitializer {
 
     @Override
     public void onInitializeClient() {
+        ModuleManager.init();
+
         openGuiKey = KeyBindingHelper.registerKeyBinding(new KeyBinding(
                 "key.fake_client.clickgui",
                 InputUtil.Type.KEYSYM,
-                GLFW.GLFW_KEY_RIGHT_SHIFT,
+                GLFW.GLFW_KEY_R,
                 "category.fake_client"
         ));
 
@@ -27,6 +30,7 @@ public class Fake_clientClient implements ClientModInitializer {
                     client.setScreen(new ClickGuiScreen());
                 }
             }
+            ModuleManager.onTick();
         });
     }
 }
