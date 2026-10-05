@@ -43,7 +43,8 @@ public class EspRenderer {
             if (!p.isAlive()) continue;
 
             Vec3d pos = p.getPos();
-            Vec3d center = new Vec3d(pos.x, pos.y + p.getHeight() / 2, pos.z);
+            double h = p.getHeight();
+            Vec3d center = new Vec3d(pos.x, pos.y + h / 2, pos.z);
             Vec3d rel = center.subtract(cam);
 
             // Yaw rotation
@@ -60,11 +61,13 @@ public class EspRenderer {
             int sx = (int)(sw / 2.0 + rx * scale / rz2);
             int sy = (int)(sh / 2.0 - ry * scale / rz2);
 
-            int boxHeight = (int)(p.getHeight() * scale / rz2);
-            int boxWidth = (int)(0.6 * scale / rz2);
-            if (boxWidth < 8) boxWidth = 8;
-            if (boxHeight < 12) boxHeight = 12;
-            if (boxWidth > 250) boxWidth = 250;
+            // размер бокса в пикселях (без минимума, чтобы не было "жирным" вдали)
+            int boxWidth = (int)(p.getWidth() * scale / rz2);
+            int boxHeight = (int)(h * scale / rz2);
+
+            if (boxWidth < 1) boxWidth = 1;
+            if (boxHeight < 1) boxHeight = 1;
+            if (boxWidth > 200) boxWidth = 200;
             if (boxHeight > 400) boxHeight = 400;
 
             int x1 = sx - boxWidth / 2;
@@ -72,15 +75,25 @@ public class EspRenderer {
             int x2 = sx + boxWidth / 2;
             int y2 = sy + boxHeight / 2;
 
-            drawOutline(ctx, x1, y1, x2, y2, 0xFFFF3333);
+            // толщина линии зависит от размера бокса
+            int t;
+            if (boxWidth > 40) t = 2;
+            else if (boxWidth > 15) t = 1;
+            else t = 1;
+
+            drawOutline(ctx, x1, y1, x2, y2, 0xFFFF3333, t);
         }
     }
 
-    private static void drawOutline(DrawContext ctx, int x1, int y1, int x2, int y2, int color) {
-        int t = 2;
+    private static void drawOutline(DrawContext ctx, int x1, int y1, int x2, int y2, int color, int t) {
+        if (t < 1) t = 1;
+        // верх
         ctx.fill(x1, y1, x2, y1 + t, color);
+        // низ
         ctx.fill(x1, y2 - t, x2, y2, color);
+        // лево
         ctx.fill(x1, y1, x1 + t, y2, color);
+        // право
         ctx.fill(x2 - t, y1, x2, y2, color);
     }
 
@@ -90,4 +103,4 @@ public class EspRenderer {
         }
         return false;
     }
-                      }
+                }
