@@ -29,8 +29,8 @@ public class ClickGuiScreen extends Screen {
     private static final int BG_CAT_HOVER  = 0xFF1F1F26;
     private static final int BG_TOGGLE_OFF = 0xFF3A3A42;
 
-    private float guiX = 8;
-    private float guiY = 20;
+    private float guiX = 0;
+    private float guiY = 0;
 
     private int selectedCategory = 0;
     private static final String[] CATS = {"Combat", "Movement", "Render", "Misc"};
@@ -51,6 +51,12 @@ public class ClickGuiScreen extends Screen {
     protected void init() {
         super.init();
         openTime = System.currentTimeMillis();
+        centerGui();
+    }
+
+    private void centerGui() {
+        guiX = (this.width - W) / 2f;
+        guiY = (this.height - H) / 2f;
     }
 
     @Override
@@ -239,4 +245,4 @@ public class ClickGuiScreen extends Screen {
         }
         return super.keyPressed(keyCode, scanCode, modifiers);
     }
-}
+                }
