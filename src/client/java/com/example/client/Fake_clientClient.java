@@ -16,6 +16,7 @@ public class Fake_clientClient implements ClientModInitializer {
     @Override
     public void onInitializeClient() {
         ModuleManager.init();
+        EspRenderer.register();
 
         openGuiKey = KeyBindingHelper.registerKeyBinding(new KeyBinding(
                 "key.fake_client.clickgui",
