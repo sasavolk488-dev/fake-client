@@ -34,6 +34,9 @@ public class ClickGuiScreen extends Screen {
     private static final int BG_SETTINGS_HD = 0xFF15151A;
     private static final int BG_BTN        = 0xFF2E2E3A;
     private static final int BG_BTN_HOVER  = 0xFF3E3E4A;
+    private static final int GEAR_BG       = 0xFF3A3A46;
+    private static final int GEAR_BG_HOVER = 0xFF5A5A6E;
+    private static final int GEAR_ICON     = 0xFFFFAA44;
 
     private float guiX = 0;
     private float guiY = 0;
@@ -46,11 +49,6 @@ public class ClickGuiScreen extends Screen {
 
     private long openTime;
     private Module settingsModule = null;
-
-    // === ДОЛГИЙ ТАП ===
-    private Module pressModule = null;
-    private long pressTime = 0;
-    private double pressX = 0, pressY = 0;
 
     public ClickGuiScreen() {
         super(Text.literal("ClickGUI"));
@@ -72,18 +70,6 @@ public class ClickGuiScreen extends Screen {
         long elapsed = System.currentTimeMillis() - openTime;
         float t = Math.min(1f, elapsed / 180f);
         float openAnim = 1f - (1f - t) * (1f - t);
-
-        // === ПРОВЕРКА ДОЛГОГО ТАПА ===
-        if (pressModule != null) {
-            long held = System.currentTimeMillis() - pressTime;
-            double dx = mouseX - pressX;
-            double dy = mouseY - pressY;
-            double moved = Math.sqrt(dx * dx + dy * dy);
-            if (held > 500 && moved < 15 && !pressModule.settings.isEmpty()) {
-                settingsModule = pressModule;
-                pressModule = null;
-            }
-        }
 
         ctx.fill(0, 0, width, height, ((int) (0x50 * openAnim)) << 24);
 
@@ -170,41 +156,65 @@ public class ClickGuiScreen extends Screen {
             boolean hover = mouseX >= cardX && mouseX <= cardX + colW
                     && mouseY >= cardY && mouseY <= cardY + ROW_H;
 
-            // подсветка если долгий тап
-            boolean pressing = (pressModule == m);
-            int bg = hover ? BG_ROW_HOVER : BG_ROW;
-            if (pressing) {
-                long held = System.currentTimeMillis() - pressTime;
-                if (held > 200) bg = 0xFF44445A;
-            }
-
-            ctx.fill(cardX, cardY, cardX + colW, cardY + ROW_H, bg);
+            ctx.fill(cardX, cardY, cardX + colW, cardY + ROW_H,
+                    hover ? BG_ROW_HOVER : BG_ROW);
 
             int textColor = m.enabled ? 0xFFFFFFFF : 0xFFAAAAAA;
             ctx.drawTextWithShadow(textRenderer, Text.literal(m.name),
                     cardX + 7, cardY + 6, textColor);
 
-            // желтая точка если есть настройки
+            // === КНОПКА-ШЕСТЕРЁНКА ===
             if (!m.settings.isEmpty()) {
-                ctx.fill(cardX + colW - 6, cardY + 4, cardX + colW - 3, cardY + 7, 0xFFFFAA44);
+                int gearSize = 14;
+                int gx = cardX + colW - gearSize - 4;
+                int gy = cardY + (ROW_H - gearSize) / 2;
+
+                // тумблер сдвигаем левее, чтобы не пересекался
+                int tsw = 20;
+                int tsh = 11;
+                int tx = gx - tsw - 4;
+                int ty = cardY + (ROW_H - tsh) / 2;
+
+                ctx.fill(tx, ty, tx + tsw, ty + tsh, BG_TOGGLE_OFF);
+                if (m.anim > 0.01f) {
+                    int fillW = Math.max(1, (int) (tsw * m.anim));
+                    ctx.fill(tx, ty, tx + fillW, ty + tsh, 0xFFFFFFFF);
+                }
+                int knob = tsh - 3;
+                int kx = tx + 1 + (int) ((tsw - knob - 2) * m.anim);
+                int knobColor = m.anim > 0.5f ? 0xFF23232A : 0xFF888888;
+                ctx.fill(kx, ty + 1, kx + knob, ty + 1 + knob, knobColor);
+
+                // шестерёнка
+                boolean gearHover = mouseX >= gx && mouseX <= gx + gearSize
+                        && mouseY >= gy && mouseY <= gy + gearSize;
+                ctx.fill(gx, gy, gx + gearSize, gy + gearSize,
+                        gearHover ? GEAR_BG_HOVER : GEAR_BG);
+
+                // иконка шестерёнки (пиксельная)
+                int cxx = gx + gearSize / 2;
+                int cyy = gy + gearSize / 2;
+                ctx.fill(cxx - 1, cyy - 3, cxx + 1, cyy + 3, GEAR_ICON);
+                ctx.fill(cxx - 3, cyy - 1, cxx + 3, cyy + 1, GEAR_ICON);
+                ctx.fill(cxx - 2, cyy - 2, cxx + 2, cyy + 2, GEAR_BG);
+                ctx.fill(cxx - 1, cyy - 1, cxx + 1, cyy + 1, GEAR_ICON);
+            } else {
+                // без настроек — обычный тумблер справа
+                int tsw = 20;
+                int tsh = 11;
+                int tx = cardX + colW - tsw - 6;
+                int ty = cardY + (ROW_H - tsh) / 2;
+
+                ctx.fill(tx, ty, tx + tsw, ty + tsh, BG_TOGGLE_OFF);
+                if (m.anim > 0.01f) {
+                    int fillW = Math.max(1, (int) (tsw * m.anim));
+                    ctx.fill(tx, ty, tx + fillW, ty + tsh, 0xFFFFFFFF);
+                }
+                int knob = tsh - 3;
+                int kx = tx + 1 + (int) ((tsw - knob - 2) * m.anim);
+                int knobColor = m.anim > 0.5f ? 0xFF23232A : 0xFF888888;
+                ctx.fill(kx, ty + 1, kx + knob, ty + 1 + knob, knobColor);
             }
-
-            int tsw = 20;
-            int tsh = 11;
-            int tx = cardX + colW - tsw - 8;
-            int ty = cardY + (ROW_H - tsh) / 2;
-
-            ctx.fill(tx, ty, tx + tsw, ty + tsh, BG_TOGGLE_OFF);
-
-            if (m.anim > 0.01f) {
-                int fillW = Math.max(1, (int) (tsw * m.anim));
-                ctx.fill(tx, ty, tx + fillW, ty + tsh, 0xFFFFFFFF);
-            }
-
-            int knob = tsh - 3;
-            int kx = tx + 1 + (int) ((tsw - knob - 2) * m.anim);
-            int knobColor = m.anim > 0.5f ? 0xFF23232A : 0xFF888888;
-            ctx.fill(kx, ty + 1, kx + knob, ty + 1 + knob, knobColor);
         }
     }
 
@@ -383,43 +393,30 @@ public class ClickGuiScreen extends Screen {
 
             if (mx >= cardX && mx <= cardX + colW && my >= cardY && my <= cardY + ROW_H) {
 
-                // ПКМ (button 1) → сразу открыть настройки
+                // ПКМ → тоже открываем настройки (если поддерживается)
                 if (button == 1) {
                     if (!m.settings.isEmpty()) settingsModule = m;
                     return true;
                 }
 
-                // ЛКМ → запоминаем для долгого тапа
-                pressModule = m;
-                pressTime = System.currentTimeMillis();
-                pressX = mx;
-                pressY = my;
+                // === ЛКМ: сначала проверяем шестерёнку ===
+                if (!m.settings.isEmpty()) {
+                    int gearSize = 14;
+                    int gx = cardX + colW - gearSize - 4;
+                    int gy = cardY + (ROW_H - gearSize) / 2;
+                    if (mx >= gx && mx <= gx + gearSize && my >= gy && my <= gy + gearSize) {
+                        settingsModule = m;
+                        return true;
+                    }
+                }
+
+                // === ЛКМ по остальному → toggle ===
+                m.toggle();
                 return true;
             }
         }
 
         return super.mouseClicked(mx, my, button);
-    }
-
-    @Override
-    public boolean mouseReleased(double mx, double my, int button) {
-        // Если был долгий тап — уже обработали в render(). Иначе — короткий клик = toggle
-        if (pressModule != null) {
-            long held = System.currentTimeMillis() - pressTime;
-            double dx = mx - pressX;
-            double dy = my - pressY;
-            double moved = Math.sqrt(dx * dx + dy * dy);
-
-            if (held < 500 && moved < 15) {
-                // короткий тап → toggle
-                pressModule.toggle();
-            }
-            // если held > 500 — уже открылись настройки в render()
-            pressModule = null;
-        }
-
-        dragging = false;
-        return super.mouseReleased(mx, my, button);
     }
 
     @Override
@@ -429,15 +426,13 @@ public class ClickGuiScreen extends Screen {
             guiY = (float) (my - dragOffY);
             return true;
         }
-        // Если тянем палец по карточке — сбрасываем press (это не долгий тап)
-        if (pressModule != null) {
-            double pdx = mx - pressX;
-            double pdy = my - pressY;
-            if (Math.sqrt(pdx * pdx + pdy * pdy) > 15) {
-                pressModule = null;
-            }
-        }
         return super.mouseDragged(mx, my, button, dx, dy);
+    }
+
+    @Override
+    public boolean mouseReleased(double mx, double my, int button) {
+        dragging = false;
+        return super.mouseReleased(mx, my, button);
     }
 
     @Override
@@ -452,4 +447,4 @@ public class ClickGuiScreen extends Screen {
         }
         return super.keyPressed(keyCode, scanCode, modifiers);
     }
-        }
+            }
