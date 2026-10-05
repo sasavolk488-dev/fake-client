@@ -5,25 +5,37 @@ import net.minecraft.entity.Entity;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.network.packet.c2s.play.PlayerInteractEntityC2SPacket;
 import net.minecraft.util.Hand;
+import net.minecraft.util.math.MathHelper;
 
 import java.util.Random;
 
 public class KillAuraModule extends Module {
 
+    // === НАСТРОЙКИ ===
     public final Setting rangeSet;
     public final Setting minCpsSet;
     public final Setting maxCpsSet;
     public final Setting rotSpeedSet;
+    public final Setting silentRotSet;
+    public final Setting randomizeSet;
+    public final Setting throughWallsSet;
 
     private long lastAttack = 0;
     private final Random random = new Random();
+
+    // silent rotation — сервер видит, клиент нет
+    private float serverYaw = 0;
+    private float serverPitch = 0;
 
     public KillAuraModule() {
         super("KillAura", "Автоатака ближайшего игрока", "Combat", false);
         rangeSet = num("Range", 3.0f, 1.0f, 6.0f, 0.1f);
         minCpsSet = num("Min CPS", 8f, 4f, 20f, 1f);
         maxCpsSet = num("Max CPS", 14f, 4f, 20f, 1f);
-        rotSpeedSet = num("Rot Speed", 25f, 5f, 90f, 5f);
+        rotSpeedSet = num("Rot Speed", 35f, 5f, 180f, 5f);
+        silentRotSet = bool("Silent Rot", true);
+        randomizeSet = bool("Randomize", true);
+        throughWallsSet = bool("Walls", false);
     }
 
     @Override
@@ -36,7 +48,11 @@ public class KillAuraModule extends Module {
         int minCps = (int) minCpsSet.value;
         int maxCps = (int) maxCpsSet.value;
         float rotSpeed = rotSpeedSet.value;
+        boolean silent = silentRotSet.boolValue;
+        boolean randomize = randomizeSet.boolValue;
+        boolean walls = throughWallsSet.boolValue;
 
+        // ===== ПОИСК ЦЕЛИ =====
         PlayerEntity target = null;
         double bestDist = range * range;
 
@@ -54,43 +70,90 @@ public class KillAuraModule extends Module {
 
         if (target == null) return;
 
+        // ===== РАСЧЁТ ЦЕЛЕВЫХ УГЛОВ =====
         double dx = target.getX() - mc.player.getX();
         double dz = target.getZ() - mc.player.getZ();
-        double dy = (target.getY() + target.getEyeHeight(target.getPose()))
-                  - (mc.player.getY() + mc.player.getEyeHeight(mc.player.getPose()));
+
+        // цель по центру туловища
+        double targetY = target.getY() + target.getHeight() * 0.6;
+        double selfY = mc.player.getY() + mc.player.getEyeHeight(mc.player.getPose());
+        double dy = targetY - selfY;
 
         double distXZ = Math.sqrt(dx * dx + dz * dz);
 
         float targetYaw = (float) (Math.toDegrees(Math.atan2(dz, dx)) - 90.0);
         float targetPitch = (float) -Math.toDegrees(Math.atan2(dy, distXZ));
 
-        float currentYaw = mc.player.getYaw();
-        float currentPitch = mc.player.getPitch();
+        // небольшой рандом на цель — чтобы не бить всегда в одну точку
+        if (randomize) {
+            targetYaw += (random.nextFloat() - 0.5f) * 3.0f;
+            targetPitch += (random.nextFloat() - 0.5f) * 2.0f;
+        }
 
-        float yawDiff = wrapDegrees(targetYaw - currentYaw);
-        float pitchDiff = wrapDegrees(targetPitch - currentPitch);
+        // ===== ПЛАВНЫЙ ПОВОРОТ (SILENT) =====
+        float curServerYaw = silent ? serverYaw : mc.player.getYaw();
+        float curServerPitch = silent ? serverPitch : mc.player.getPitch();
 
-        float newYaw = currentYaw + clamp(yawDiff, -rotSpeed, rotSpeed);
-        float newPitch = currentPitch + clamp(pitchDiff, -rotSpeed, rotSpeed);
+        float yawDiff = wrapDegrees(targetYaw - curServerYaw);
+        float pitchDiff = wrapDegrees(targetPitch - curServerPitch);
 
-        mc.player.setYaw(newYaw);
-        mc.player.setPitch(newPitch);
+        // скорость плавная: чем больше разница, тем быстрее догоняем
+        float yawStep = Math.min(Math.abs(yawDiff), rotSpeed);
+        float pitchStep = Math.min(Math.abs(pitchDiff), rotSpeed * 0.7f);
 
-        float yawToTarget = Math.abs(wrapDegrees(targetYaw - mc.player.getYaw()));
-        float pitchToTarget = Math.abs(wrapDegrees(targetPitch - mc.player.getPitch()));
+        float newServerYaw = curServerYaw + Math.copySign(yawStep, yawDiff);
+        float newServerPitch = MathHelper.clamp(
+                curServerPitch + Math.copySign(pitchStep, pitchDiff),
+                -90f, 90f);
 
+        if (silent) {
+            serverYaw = newServerYaw;
+            serverPitch = newServerPitch;
+
+            // применяем к entity — сервер увидит поворот
+            mc.player.setYaw(newServerYaw);
+            mc.player.setPitch(newServerPitch);
+            mc.player.prevYaw = newServerYaw;
+            mc.player.prevPitch = newServerPitch;
+        } else {
+            // обычный поворот — видно и тебе и серверу
+            mc.player.setYaw(newServerYaw);
+            mc.player.setPitch(newServerPitch);
+        }
+
+        // ===== ПРОВЕРКА НАВЕДЕНИЯ =====
+        float yawToTarget = Math.abs(wrapDegrees(targetYaw - newServerYaw));
+        float pitchToTarget = Math.abs(wrapDegrees(targetPitch - newServerPitch));
+
+        // не бьём, пока не навелись (30° — порог)
         if (yawToTarget > 30.0f || pitchToTarget > 30.0f) return;
 
+        // ===== АТАКА =====
         long now = System.currentTimeMillis();
         int cps = minCps + random.nextInt(Math.max(1, maxCps - minCps + 1));
-        long delay = 1000L / Math.max(1, cps);
+        // небольшой рандом в задержке — не идеально ровные удары
+        long delay = 1000L / Math.max(1, cps) + (random.nextInt(15) - 7);
         if (now - lastAttack < delay) return;
 
         if (mc.getNetworkHandler() != null) {
-            PlayerInteractEntityC2SPacket packet = PlayerInteractEntityC2SPacket.attack(target, mc.player.isSneaking());
+            PlayerInteractEntityC2SPacket packet = PlayerInteractEntityC2SPacket.attack(
+                    target, mc.player.isSneaking());
             mc.getNetworkHandler().sendPacket(packet);
             mc.player.swingHand(Hand.MAIN_HAND);
             lastAttack = now;
+        }
+    }
+
+    @Override
+    public void toggle() {
+        super.toggle();
+        // при выключении сбрасываем silent rotation
+        if (!enabled) {
+            MinecraftClient mc = MinecraftClient.getInstance();
+            if (mc.player != null) {
+                serverYaw = mc.player.getYaw();
+                serverPitch = mc.player.getPitch();
+            }
         }
     }
 
@@ -100,10 +163,4 @@ public class KillAuraModule extends Module {
         if (angle < -180.0f) angle += 360.0f;
         return angle;
     }
-
-    private static float clamp(float value, float min, float max) {
-        if (value < min) return min;
-        if (value > max) return max;
-        return value;
-    }
-            }
+        }
