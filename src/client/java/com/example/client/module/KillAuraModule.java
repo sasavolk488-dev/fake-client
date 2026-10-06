@@ -16,12 +16,10 @@ public class KillAuraModule extends Module {
     public final Setting minCpsSet;
     public final Setting maxCpsSet;
     public final Setting useRotationSet;
+    public final Setting wallsSet;
 
     private long lastAttack = 0;
     private final Random random = new Random();
-
-    private float serverYaw = 0;
-    private float serverPitch = 0;
 
     public KillAuraModule() {
         super("KillAura", "Автоатака ближайшего игрока", "Combat", false);
@@ -29,6 +27,7 @@ public class KillAuraModule extends Module {
         minCpsSet = num("Min CPS", 8f, 4f, 20f, 1f);
         maxCpsSet = num("Max CPS", 14f, 4f, 20f, 1f);
         useRotationSet = bool("Use Rotation", true);
+        wallsSet = bool("Walls", false);
     }
 
     private RotationModule getRotation() {
@@ -50,6 +49,7 @@ public class KillAuraModule extends Module {
         int minCps = (int) minCpsSet.value;
         int maxCps = (int) maxCpsSet.value;
         boolean useRotation = useRotationSet.boolValue;
+        boolean walls = wallsSet.boolValue;
 
         // ===== ПОИСК ЦЕЛИ =====
         PlayerEntity target = null;
@@ -59,6 +59,8 @@ public class KillAuraModule extends Module {
             if (e == mc.player) continue;
             if (!e.isAlive()) continue;
             if (!(e instanceof PlayerEntity)) continue;
+
+            if (!walls && !mc.player.canSee(e)) continue;
 
             double d = mc.player.squaredDistanceTo(e);
             if (d < bestDist) {
@@ -75,35 +77,34 @@ public class KillAuraModule extends Module {
         float targetYaw, targetPitch;
 
         if (rotation != null) {
-            // используем Rotation модуль
             rotation.setTarget(target);
             rotation.onTick();
 
             targetYaw = rotation.getYaw();
             targetPitch = rotation.getPitch();
         } else {
-            // встроенный поворот (как раньше)
+            // встроенный поворот
             double dx = target.getX() - mc.player.getX();
             double dz = target.getZ() - mc.player.getZ();
 
-            double targetY = target.getY() + target.getHeight() * 0.6;
+            double targetY = target.getY() + target.getHeight() * 0.5;
             double selfY = mc.player.getY() + mc.player.getEyeHeight(mc.player.getPose());
             double dy = targetY - selfY;
 
             double distXZ = Math.sqrt(dx * dx + dz * dz);
 
-            targetYaw = (float) (Math.toDegrees(Math.atan2(dz, dx)) - 90.0);
-            targetPitch = (float) -Math.toDegrees(Math.atan2(dy, distXZ));
+            float realTargetYaw = (float) (Math.toDegrees(Math.atan2(dz, dx)) - 90.0);
+            float realTargetPitch = (float) -Math.toDegrees(Math.atan2(dy, distXZ));
 
-            float rotSpeed = 35f;
+            float rotSpeed = 30f;
             float curYaw = mc.player.getYaw();
             float curPitch = mc.player.getPitch();
 
-            float yawDiff = wrapDegrees(targetYaw - curYaw);
-            float pitchDiff = wrapDegrees(targetPitch - curPitch);
+            float yawDiff = wrapDegrees(realTargetYaw - curYaw);
+            float pitchDiff = wrapDegrees(realTargetPitch - curPitch);
 
             float step = Math.min(Math.abs(yawDiff), rotSpeed);
-            float pstep = Math.min(Math.abs(pitchDiff), rotSpeed * 0.7f);
+            float pstep = Math.min(Math.abs(pitchDiff), rotSpeed * 0.6f);
 
             float newYaw = curYaw + Math.copySign(step, yawDiff);
             float newPitch = MathHelper.clamp(curPitch + Math.copySign(pstep, pitchDiff), -90f, 90f);
@@ -123,12 +124,29 @@ public class KillAuraModule extends Module {
 
         if (yawToTarget > 25.0f || pitchToTarget > 25.0f) return;
 
-        // ===== АТАКА =====
+        // ===== LEGIT CPS =====
         long now = System.currentTimeMillis();
+
         int cps = minCps + random.nextInt(Math.max(1, maxCps - minCps + 1));
-        long delay = 1000L / Math.max(1, cps) + (random.nextInt(15) - 7);
+        long baseDelay = 1000L / Math.max(1, cps);
+
+        // большой разброс (±40%)
+        long randomOffset = (long)((random.nextDouble() - 0.5) * baseDelay * 0.8);
+
+        // иногда "пауза" — человек смотрит, прицеливается
+        if (random.nextInt(20) == 0) {
+            randomOffset += 150 + random.nextInt(200);
+        }
+
+        // иногда "burst" — два быстрых удара
+        if (random.nextInt(15) == 0) {
+            randomOffset -= baseDelay / 2;
+        }
+
+        long delay = Math.max(40, baseDelay + randomOffset);
         if (now - lastAttack < delay) return;
 
+        // ===== УДАР =====
         if (mc.getNetworkHandler() != null) {
             PlayerInteractEntityC2SPacket packet = PlayerInteractEntityC2SPacket.attack(
                     target, mc.player.isSneaking());
@@ -144,4 +162,4 @@ public class KillAuraModule extends Module {
         if (angle < -180.0f) angle += 360.0f;
         return angle;
     }
-                    }
+            }
