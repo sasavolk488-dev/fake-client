@@ -9,7 +9,8 @@ public class Module {
     public final String category;
     public boolean enabled;
     public float anim;
-    public int bindKey = -1; // -1 = нет бинда
+    public int bindKey = -1;          // -1 = нет бинда
+    public boolean wasPressed = false; // для анти-спама клавиши
     public final List<Setting> settings = new ArrayList<>();
 
     public Module(String name, String desc, String category, boolean enabled) {
@@ -20,9 +21,12 @@ public class Module {
         this.anim = enabled ? 1f : 0f;
     }
 
-    public void toggle() { enabled = !enabled; }
+    public void toggle() {
+        enabled = !enabled;
+    }
 
-    public void onTick() {}
+    public void onTick() {
+    }
 
     public Setting num(String name, float def, float min, float max, float step) {
         Setting s = new Setting(name, def, min, max, step);
@@ -73,4 +77,4 @@ public class Module {
             if (!isBool) value = Math.max(min, value - step);
         }
     }
-        }
+}
