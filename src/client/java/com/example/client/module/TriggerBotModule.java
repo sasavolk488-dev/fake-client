@@ -3,6 +3,9 @@ package com.example.client.module;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.LivingEntity;
+import net.minecraft.entity.effect.StatusEffects;
+import net.minecraft.entity.mob.HostileEntity;
+import net.minecraft.entity.passive.PassiveEntity;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.network.packet.c2s.play.PlayerInteractEntityC2SPacket;
 import net.minecraft.util.Hand;
@@ -16,9 +19,19 @@ public class TriggerBotModule extends Module {
     public final Setting minDelaySet;
     public final Setting maxDelaySet;
     public final Setting rangeSet;
-    public final Setting playersOnlySet;
-    public final Setting critOnlySet;
     public final Setting noWeaponSet;
+    public final Setting critOnlySet;
+
+    // Кого атаковать
+    public final Setting targetPlayersSet;
+    public final Setting targetNoArmorSet;
+    public final Setting targetMobsSet;
+    public final Setting targetAnimalsSet;
+    public final Setting targetFriendsSet;
+    public final Setting targetInvisibleSet;
+
+    // Атака
+    public final Setting throughWallsSet;
 
     private long lastAttack = 0;
     private long targetSeenAt = 0;
@@ -29,9 +42,17 @@ public class TriggerBotModule extends Module {
         minDelaySet = num("Min Delay", 60f, 10f, 500f, 5f);
         maxDelaySet = num("Max Delay", 120f, 10f, 500f, 5f);
         rangeSet = num("Range", 3.0f, 1.0f, 6.0f, 0.1f);
-        playersOnlySet = bool("Players Only", false);
-        critOnlySet = bool("Crit Only", false);
         noWeaponSet = bool("No Weapon", false);
+        critOnlySet = bool("Crit Only", false);
+
+        targetPlayersSet = bool("Players", true);
+        targetNoArmorSet = bool("No Armor", false);
+        targetMobsSet = bool("Mobs", false);
+        targetAnimalsSet = bool("Animals", false);
+        targetFriendsSet = bool("Friends", false);
+        targetInvisibleSet = bool("Invisible", false);
+
+        throughWallsSet = bool("Through Walls", false);
     }
 
     @Override
@@ -40,8 +61,7 @@ public class TriggerBotModule extends Module {
         if (mc.player == null || mc.world == null) return;
         if (mc.currentScreen != null) return;
 
-        // NO WEAPON = false → бить ТОЛЬКО с мечом/топором
-        // NO WEAPON = true  → бить ЛЮБЫМ предметом (включая кулак)
+        // NO WEAPON
         if (!noWeaponSet.boolValue) {
             if (!isWeapon(mc)) {
                 targetSeenAt = 0;
@@ -57,33 +77,40 @@ public class TriggerBotModule extends Module {
 
         Entity target = ((EntityHitResult) hit).getEntity();
 
-        if (!(target instanceof LivingEntity)) {
+        if (!(target instanceof LivingEntity living)) {
             targetSeenAt = 0;
             return;
         }
         if (target == mc.player) return;
         if (!target.isAlive()) return;
 
-        if (playersOnlySet.boolValue && !(target instanceof PlayerEntity)) {
+        // === Проверка категории цели ===
+        if (!isValidTarget(living)) {
             targetSeenAt = 0;
             return;
         }
 
+        // === Через блоки ===
+        if (!throughWallsSet.boolValue) {
+            if (!mc.player.canSee(target)) {
+                targetSeenAt = 0;
+                return;
+            }
+        }
+
+        // === Дистанция ===
         double dist = mc.player.distanceTo(target);
         if (dist > rangeSet.value) {
             targetSeenAt = 0;
             return;
         }
 
+        // === Crit Only ===
         if (critOnlySet.boolValue) {
-            if (mc.player.isOnGround() || mc.player.isTouchingWater() ||
-                mc.player.isClimbing() || mc.player.hasStatusEffect(
-                    net.minecraft.entity.effect.StatusEffects.BLINDNESS)) {
-                return;
-            }
-            if (mc.player.getVehicle() != null) return;
+            if (!canCrit(mc)) return;
         }
 
+        // === Задержка ===
         long now = System.currentTimeMillis();
         if (targetSeenAt == 0) {
             targetSeenAt = now;
@@ -97,6 +124,7 @@ public class TriggerBotModule extends Module {
         if (now - targetSeenAt < delay) return;
         if (now - lastAttack < delay) return;
 
+        // === Удар ===
         if (mc.getNetworkHandler() != null) {
             PlayerInteractEntityC2SPacket packet = PlayerInteractEntityC2SPacket.attack(
                     target, mc.player.isSneaking());
@@ -105,6 +133,56 @@ public class TriggerBotModule extends Module {
             lastAttack = now;
             targetSeenAt = now;
         }
+    }
+
+    private boolean isValidTarget(LivingEntity target) {
+        // Невидимые — отдельная настройка
+        if (target.isInvisible()) {
+            return targetInvisibleSet.boolValue;
+        }
+
+        // Игроки
+        if (target instanceof PlayerEntity player) {
+            // Проверка на друзей — пока заглушка (системы друзей нет)
+            boolean isFriend = false; // TODO: добавить систему друзей
+            if (isFriend) {
+                return targetFriendsSet.boolValue;
+            }
+
+            // Игроки без брони
+            if (!hasArmor(player)) {
+                return targetNoArmorSet.boolValue || targetPlayersSet.boolValue;
+            }
+
+            return targetPlayersSet.boolValue;
+        }
+
+        // Враждебные мобы
+        if (target instanceof HostileEntity) {
+            return targetMobsSet.boolValue;
+        }
+
+        // Животные
+        if (target instanceof PassiveEntity) {
+            return targetAnimalsSet.boolValue;
+        }
+
+        return false;
+    }
+
+    private boolean hasArmor(PlayerEntity player) {
+        return !player.getEquippedStack(net.minecraft.entity.EquipmentSlot.HEAD).isEmpty()
+            || !player.getEquippedStack(net.minecraft.entity.EquipmentSlot.CHEST).isEmpty()
+            || !player.getEquippedStack(net.minecraft.entity.EquipmentSlot.LEGS).isEmpty()
+            || !player.getEquippedStack(net.minecraft.entity.EquipmentSlot.FEET).isEmpty();
+    }
+
+    private boolean canCrit(MinecraftClient mc) {
+        return !mc.player.isOnGround()
+            && !mc.player.isTouchingWater()
+            && !mc.player.isClimbing()
+            && !mc.player.hasStatusEffect(StatusEffects.BLINDNESS)
+            && mc.player.getVehicle() == null;
     }
 
     private boolean isWeapon(MinecraftClient mc) {
@@ -120,4 +198,4 @@ public class TriggerBotModule extends Module {
         targetSeenAt = 0;
         lastAttack = 0;
     }
-                }
+    }
