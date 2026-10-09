@@ -9,6 +9,7 @@ public class Module {
     public final String category;
     public boolean enabled;
     public float anim;
+    public int bindKey = -1; // -1 = нет бинда
     public final List<Setting> settings = new ArrayList<>();
 
     public Module(String name, String desc, String category, boolean enabled) {
@@ -72,4 +73,4 @@ public class Module {
             if (!isBool) value = Math.max(min, value - step);
         }
     }
-                }
+        }
