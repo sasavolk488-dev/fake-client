@@ -18,7 +18,7 @@ public class TriggerBotModule extends Module {
     public final Setting rangeSet;
     public final Setting playersOnlySet;
     public final Setting critOnlySet;
-    public final Setting weaponOnlySet;
+    public final Setting noWeaponSet;
 
     private long lastAttack = 0;
     private long targetSeenAt = 0;
@@ -31,7 +31,7 @@ public class TriggerBotModule extends Module {
         rangeSet = num("Range", 3.0f, 1.0f, 6.0f, 0.1f);
         playersOnlySet = bool("Players Only", false);
         critOnlySet = bool("Crit Only", false);
-        weaponOnlySet = bool("Weapon Only", true);
+        noWeaponSet = bool("No Weapon", false);
     }
 
     @Override
@@ -40,7 +40,9 @@ public class TriggerBotModule extends Module {
         if (mc.player == null || mc.world == null) return;
         if (mc.currentScreen != null) return;
 
-        if (weaponOnlySet.boolValue) {
+        // NO WEAPON = false → бить ТОЛЬКО с мечом/топором
+        // NO WEAPON = true  → бить ЛЮБЫМ предметом (включая кулак)
+        if (!noWeaponSet.boolValue) {
             if (!isWeapon(mc)) {
                 targetSeenAt = 0;
                 return;
@@ -118,4 +120,4 @@ public class TriggerBotModule extends Module {
         targetSeenAt = 0;
         lastAttack = 0;
     }
-          }
+                }
