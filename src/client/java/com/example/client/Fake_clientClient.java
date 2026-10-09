@@ -26,28 +26,28 @@ public class Fake_clientClient implements ClientModInitializer {
         ));
 
         ClientTickEvents.END_CLIENT_TICK.register(client -> {
-            // Открытие GUI
+            // Открытие ClickGUI (Right Shift)
             while (openGuiKey.wasPressed()) {
                 if (client.currentScreen == null) {
                     client.setScreen(new ClickGuiScreen());
                 }
             }
 
-            // Проверка биндов модулей
-            if (client.currentScreen == null) {
+            // === Проверка биндов модулей ===
+            if (client.currentScreen == null && client.getWindow() != null) {
                 long handle = client.getWindow().getHandle();
+
                 for (Module m : ModuleManager.modules) {
-                    if (m.bindKey > 0) {
-                        // Проверяем нажатие через GLFW
-                        if (GLFW.glfwGetKey(handle, m.bindKey) == GLFW.GLFW_PRESS) {
-                            // Анти-спам: проверяем что не нажато на прошлом тике
-                            if (!m.wasPressed) {
-                                m.toggle();
-                                m.wasPressed = true;
-                            }
-                        } else {
-                            m.wasPressed = false;
-                        }
+                    if (m.bindKey <= 0) continue;
+
+                    boolean pressed = GLFW.glfwGetKey(handle, m.bindKey) == GLFW.GLFW_PRESS;
+
+                    // Анти-спам: срабатывает только при первом нажатии
+                    if (pressed && !m.wasPressed) {
+                        m.toggle();
+                        m.wasPressed = true;
+                    } else if (!pressed) {
+                        m.wasPressed = false;
                     }
                 }
             }
