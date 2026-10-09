@@ -11,8 +11,17 @@ import java.util.List;
 
 public class ClickGuiScreen extends Screen {
 
-    // ===== LIMINAR COLORS =====
-    private static final int C_BG          = 0xFF0D0D14;
+    private static final int W = 400;
+    private static final int H = 250;
+    private static final int HEADER_H = 26;
+    private static final int SIDEBAR_W = 90;
+    private static final int ROW_H = 22;
+    private static final int ROW_GAP = 5;
+    private static final int COL_GAP = 5;
+    private static final int SETTINGS_W = 220;
+    private static final int SETTINGS_ROW_H = 26;
+
+    private static final int C_BG          = 0xF00D0D14;
     private static final int C_SIDEBAR     = 0xFF0A0A10;
     private static final int C_MIDDLE      = 0xFF0F0F18;
     private static final int C_RIGHT       = 0xFF0D0D18;
@@ -27,11 +36,11 @@ public class ClickGuiScreen extends Screen {
     private static final int C_TOGGLE_OFF  = 0xFF2A2A3A;
     private static final int C_SLIDER_BG   = 0xFF252535;
     private static final int C_SEARCH_BG   = 0xFF14141E;
+    private static final int C_BIND_BG     = 0xFF1F1F2E;
+    private static final int C_BIND_HOVER  = 0xFF2A2A40;
+    private static final int C_BIND_ACTIVE = 0xFF3BB8F0;
 
-    // ===== SIZES =====
-    private static final int W = 380;
-    private static final int H = 220;
-    private static final int SIDEBAR_W = 85;
+    private static final int SIDEBAR_MID = 90;
     private static final int MIDDLE_W = 140;
     private static final int RIGHT_W = W - SIDEBAR_W - MIDDLE_W - 2;
 
@@ -42,11 +51,11 @@ public class ClickGuiScreen extends Screen {
     private static final String[] CATS = {"Combat", "Movement", "Render", "Player", "Utilities", "Themes", "Configs"};
 
     private Module selectedModule = null;
+    private Module bindingModule = null; // для какой карточки ждём клавишу
     private boolean dragging = false;
     private double dragOffX, dragOffY;
     private long openTime;
 
-    // Slider drag state
     private Module.Setting dragSlider = null;
     private int dragSliderX = 0, dragSliderW = 0;
 
@@ -89,6 +98,9 @@ public class ClickGuiScreen extends Screen {
 
         drawWindow(ctx, mouseX, mouseY);
 
+        // Окно ожидания клавиши
+        if (bindingModule != null) drawBindOverlay(ctx);
+
         ctx.getMatrices().pop();
     }
 
@@ -99,11 +111,10 @@ public class ClickGuiScreen extends Screen {
         ctx.fill(x + 4, y + 5, x + W + 4, y + H + 5, 0x80000000);
         ctx.fill(x, y, x + W, y + H, C_BG);
 
-        // ============ SIDEBAR ============
+        // SIDEBAR
         ctx.fill(x, y, x + SIDEBAR_W, y + H, C_SIDEBAR);
         ctx.fill(x + SIDEBAR_W, y, x + SIDEBAR_W + 1, y + H, C_BORDER);
 
-        // Logo
         int lx = x + 6, ly = y + 6;
         ctx.fill(lx, ly, lx + 18, ly + 18, C_ACCENT_DIM);
         ctx.drawTextWithShadow(textRenderer, Text.literal("L"), lx + 6, ly + 6, C_ACCENT);
@@ -114,7 +125,6 @@ public class ClickGuiScreen extends Screen {
 
         ctx.fill(x + 6, y + 40, x + SIDEBAR_W - 6, y + 41, C_BORDER);
 
-        // Categories
         for (int i = 0; i < CATS.length; i++) {
             int cy2 = y + 46 + i * 20;
             boolean hover = mouseX >= x && mouseX <= x + SIDEBAR_W && mouseY >= cy2 && mouseY <= cy2 + 18;
@@ -133,16 +143,14 @@ public class ClickGuiScreen extends Screen {
             ctx.drawTextWithShadow(textRenderer, Text.literal(CATS[i]), x + 24, cy2 + 5, tc);
         }
 
-        // Search
         int sy = y + H - 22;
         ctx.fill(x + 4, sy, x + SIDEBAR_W - 4, sy + 16, C_SEARCH_BG);
         ctx.drawTextWithShadow(textRenderer, Text.literal("Поиск..."), x + 10, sy + 4, C_TEXT_DIM);
 
-        // ============ MIDDLE ============
+        // MIDDLE
         int mx = x + SIDEBAR_W + 1;
         ctx.fill(mx, y, mx + MIDDLE_W, y + H, C_MIDDLE);
 
-        // Header
         ctx.drawTextWithShadow(textRenderer, Text.literal(CATS[selectedCategory]), mx + 8, y + 7, C_TEXT);
 
         List<Module> mods = ModuleManager.byCategory(CATS[selectedCategory]);
@@ -153,33 +161,50 @@ public class ClickGuiScreen extends Screen {
 
         ctx.fill(mx, y + 32, mx + MIDDLE_W, y + 33, C_BORDER);
 
-        // Module rows
         for (int i = 0; i < mods.size(); i++) {
             Module m = mods.get(i);
-            int ry = y + 36 + i * 20;
-            if (ry + 18 > y + H - 4) break;
+            int ry = y + 36 + i * 22;
+            if (ry + 20 > y + H - 4) break;
 
-            boolean hover = mouseX >= mx && mouseX <= mx + MIDDLE_W && mouseY >= ry && mouseY <= ry + 18;
+            boolean hover = mouseX >= mx && mouseX <= mx + MIDDLE_W && mouseY >= ry && mouseY <= ry + 20;
             boolean isSelected = (selectedModule == m);
 
             if (isSelected) {
-                ctx.fill(mx, ry, mx + MIDDLE_W, ry + 18, C_ROW_ACTIVE);
+                ctx.fill(mx, ry, mx + MIDDLE_W, ry + 20, C_ROW_ACTIVE);
             } else if (hover) {
-                ctx.fill(mx, ry, mx + MIDDLE_W, ry + 18, C_ROW_HOVER);
+                ctx.fill(mx, ry, mx + MIDDLE_W, ry + 20, C_ROW_HOVER);
             }
 
             int tc = m.enabled ? C_TEXT : C_TEXT_DIM;
-            ctx.drawTextWithShadow(textRenderer, Text.literal(m.name), mx + 8, ry + 5, tc);
+            ctx.drawTextWithShadow(textRenderer, Text.literal(m.name), mx + 8, ry + 6, tc);
 
-            // Round toggle with checkmark
+            // BIND кнопка (слева от тумблера)
+            int bindW = 22;
+            int bindH = 12;
+            int bindX = mx + MIDDLE_W - 22 - bindW - 6;
+            int bindY = ry + 4;
+
+            boolean bindHover = mouseX >= bindX && mouseX <= bindX + bindW
+                    && mouseY >= bindY && mouseY <= bindY + bindH;
+
+            String bindText = m.bindKey > 0 ? getKeyName(m.bindKey) : "-";
+            int bindBg = m.bindKey > 0 ? C_BIND_ACTIVE : (bindHover ? C_BIND_HOVER : C_BIND_BG);
+
+            ctx.fill(bindX, bindY, bindX + bindW, bindY + bindH, bindBg);
+
+            int bindTextColor = m.bindKey > 0 ? 0xFF000000 : C_TEXT_DIM;
+            int tw = textRenderer.getWidth(bindText);
+            ctx.drawTextWithShadow(textRenderer, Text.literal(bindText),
+                    bindX + (bindW - tw) / 2, bindY + 2, bindTextColor);
+
+            // Toggle
             int tr = 5;
             int tx = mx + MIDDLE_W - 12;
-            int ty = ry + 9;
+            int ty = ry + 10;
 
             ctx.fill(tx - tr, ty - tr, tx + tr, ty + tr, m.enabled ? C_ACCENT : C_TOGGLE_OFF);
 
             if (m.enabled) {
-                // Checkmark (white)
                 ctx.fill(tx - 2, ty, tx - 1, ty + 2, 0xFFFFFFFF);
                 ctx.fill(tx - 1, ty + 1, tx, ty + 3, 0xFFFFFFFF);
                 ctx.fill(tx, ty, tx + 1, ty + 2, 0xFFFFFFFF);
@@ -187,7 +212,7 @@ public class ClickGuiScreen extends Screen {
             }
         }
 
-        // ============ RIGHT ============
+        // RIGHT
         int rx = mx + MIDDLE_W + 1;
         ctx.fill(rx, y, rx + RIGHT_W, y + H, C_RIGHT);
         ctx.fill(rx - 1, y, rx, y + H, C_BORDER);
@@ -201,7 +226,6 @@ public class ClickGuiScreen extends Screen {
                 if (ry2 + 24 > y + H - 4) break;
 
                 if (s.isBool) {
-                    // Toggle row
                     ctx.drawTextWithShadow(textRenderer, Text.literal(s.name), rx + 8, ry2 + 4, C_TEXT);
 
                     int tr = 5;
@@ -218,7 +242,6 @@ public class ClickGuiScreen extends Screen {
                     }
                     ry2 += 24;
                 } else {
-                    // Slider
                     ctx.drawTextWithShadow(textRenderer, Text.literal(s.name), rx + 8, ry2, C_TEXT);
 
                     String valStr = (s.step >= 1f) ? String.valueOf((int) s.value) : String.format("%.1f", s.value);
@@ -252,51 +275,65 @@ public class ClickGuiScreen extends Screen {
         }
     }
 
+    private void drawBindOverlay(DrawContext ctx) {
+        // Затемнение
+        ctx.fill(0, 0, width, height, 0xA0000000);
+
+        // Окно
+        int bw = 220, bh = 70;
+        int bx = (width - bw) / 2;
+        int by = (height - bh) / 2;
+
+        ctx.fill(bx + 3, by + 3, bx + bw + 3, by + bh + 3, 0x60000000);
+        ctx.fill(bx, by, bx + bw, by + bh, 0xF0141418);
+        ctx.fill(bx, by, bx + bw, by + 2, C_ACCENT);
+
+        ctx.drawTextWithShadow(textRenderer, Text.literal("Нажми клавишу..."),
+                bx + 12, by + 16, C_TEXT);
+        ctx.drawTextWithShadow(textRenderer, Text.literal("Модуль: " + bindingModule.name),
+                bx + 12, by + 32, C_ACCENT);
+        ctx.drawTextWithShadow(textRenderer, Text.literal("Esc — отмена"),
+                bx + 12, by + 50, C_TEXT_DIM);
+    }
+
+    private String getKeyName(int key) {
+        String name = GLFW.glfwGetKeyName(key, 0);
+        if (name != null) return name.toUpperCase();
+        // Спец-клавиши
+        switch (key) {
+            case GLFW.GLFW_KEY_SPACE: return "SPC";
+            case GLFW.GLFW_KEY_LEFT_SHIFT: return "LSH";
+            case GLFW.GLFW_KEY_RIGHT_SHIFT: return "RSH";
+            case GLFW.GLFW_KEY_LEFT_CONTROL: return "LCT";
+            case GLFW.GLFW_KEY_RIGHT_CONTROL: return "RCT";
+            case GLFW.GLFW_KEY_LEFT_ALT: return "LAL";
+            case GLFW.GLFW_KEY_RIGHT_ALT: return "RAL";
+            case GLFW.GLFW_KEY_TAB: return "TAB";
+            case GLFW.GLFW_KEY_ENTER: return "ENT";
+            case GLFW.GLFW_KEY_BACKSPACE: return "BCK";
+            case GLFW.GLFW_KEY_UP: return "UP";
+            case GLFW.GLFW_KEY_DOWN: return "DWN";
+            case GLFW.GLFW_KEY_LEFT: return "LFT";
+            case GLFW.GLFW_KEY_RIGHT: return "RGT";
+            default: return "K" + key;
+        }
+    }
+
     @Override
     public boolean mouseClicked(double mx, double my, int button) {
-        int x = (int) guiX;
-        int y = (int) guiY;
-
-        // Sidebar categories
-        for (int i = 0; i < CATS.length; i++) {
-            int cy2 = y + 46 + i * 20;
-            if (mx >= x && mx <= x + SIDEBAR_W && my >= cy2 && my <= cy2 + 18) {
-                selectedCategory = i;
-                selectedModule = null;
-                return true;
-            }
+        // Если ждём клавишу — ЛЮБОЙ клик = отмена
+        if (bindingModule != null) {
+            bindingModule = null;
+            return true;
         }
 
-        // Middle module rows
-        int mx2 = x + SIDEBAR_W + 1;
-        List<Module> mods = ModuleManager.byCategory(CATS[selectedCategory]);
-        for (int i = 0; i < mods.size(); i++) {
-            int ry = y + 36 + i * 20;
-            if (ry + 18 > y + H - 4) break;
+        // Настройки открыты
+        if (selectedModule != null && button == 0) {
+            int x = (int) guiX;
+            int y = (int) guiY;
+            int mx2 = x + SIDEBAR_W + 1;
+            int rx = mx2 + MIDDLE_W + 1;
 
-            if (mx >= mx2 && mx <= mx2 + MIDDLE_W && my >= ry && my <= ry + 18) {
-                Module m = mods.get(i);
-
-                // Click on toggle area (right side)
-                int tx = mx2 + MIDDLE_W - 12;
-                if (mx >= tx - 8 && mx <= tx + 8) {
-                    m.toggle();
-                    return true;
-                }
-
-                // Click on row → select module
-                if (!m.settings.isEmpty()) {
-                    selectedModule = m;
-                } else {
-                    m.toggle();
-                }
-                return true;
-            }
-        }
-
-        // Right panel — sliders and toggles
-        int rx = mx2 + MIDDLE_W + 1;
-        if (selectedModule != null && !selectedModule.settings.isEmpty()) {
             int ry2 = y + 28;
             for (Module.Setting s : selectedModule.settings) {
                 if (ry2 + 24 > y + H - 4) break;
@@ -314,7 +351,6 @@ public class ClickGuiScreen extends Screen {
                     int barW = RIGHT_W - 16;
                     int barY = ry2 + 14;
                     if (my >= barY - 6 && my <= barY + 6 && mx >= barX && mx <= barX + barW) {
-                        // Click or start drag on slider
                         float pct = (float)(mx - barX) / barW;
                         pct = Math.max(0f, Math.min(1f, pct));
                         s.value = s.min + pct * (s.max - s.min);
@@ -329,7 +365,62 @@ public class ClickGuiScreen extends Screen {
             }
         }
 
-        // Drag window by header
+        int x = (int) guiX;
+        int y = (int) guiY;
+
+        // Категории
+        for (int i = 0; i < CATS.length; i++) {
+            int cy2 = y + 46 + i * 20;
+            if (mx >= x && mx <= x + SIDEBAR_W && my >= cy2 && my <= cy2 + 18) {
+                selectedCategory = i;
+                selectedModule = null;
+                return true;
+            }
+        }
+
+        // Модули
+        int mx2 = x + SIDEBAR_W + 1;
+        List<Module> mods = ModuleManager.byCategory(CATS[selectedCategory]);
+        for (int i = 0; i < mods.size(); i++) {
+            int ry = y + 36 + i * 22;
+            if (ry + 20 > y + H - 4) break;
+
+            if (mx >= mx2 && mx <= mx2 + MIDDLE_W && my >= ry && my <= ry + 20) {
+                Module m = mods.get(i);
+
+                // BIND кнопка
+                int bindW = 22, bindH = 12;
+                int bindX = mx2 + MIDDLE_W - 22 - bindW - 6;
+                int bindY = ry + 4;
+
+                if (mx >= bindX && mx <= bindX + bindW && my >= bindY && my <= bindY + bindH) {
+                    // ПКМ — сбросить бинд, ЛКМ — назначить
+                    if (button == 1) {
+                        m.bindKey = -1;
+                    } else {
+                        bindingModule = m;
+                    }
+                    return true;
+                }
+
+                // Toggle
+                int tx = mx2 + MIDDLE_W - 12;
+                if (mx >= tx - 8 && mx <= tx + 8) {
+                    m.toggle();
+                    return true;
+                }
+
+                // Клик по строке → выбрать для настроек
+                if (!m.settings.isEmpty()) {
+                    selectedModule = m;
+                } else {
+                    m.toggle();
+                }
+                return true;
+            }
+        }
+
+        // Шапка — перетаскивание
         if (mx >= x && mx <= x + W && my >= y && my <= y + 20 && button == 0) {
             dragging = true;
             dragOffX = mx - guiX;
@@ -367,10 +458,22 @@ public class ClickGuiScreen extends Screen {
 
     @Override
     public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
+        // Ожидание клавиши для бинда
+        if (bindingModule != null) {
+            if (keyCode == GLFW.GLFW_KEY_ESCAPE) {
+                bindingModule = null;
+                return true;
+            }
+            // Записываем бинд
+            bindingModule.bindKey = keyCode;
+            bindingModule = null;
+            return true;
+        }
+
         if (keyCode == GLFW.GLFW_KEY_ESCAPE) {
             close();
             return true;
         }
         return super.keyPressed(keyCode, scanCode, modifiers);
     }
-                 }
+    }
