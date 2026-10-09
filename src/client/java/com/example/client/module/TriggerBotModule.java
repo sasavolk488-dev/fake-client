@@ -7,6 +7,10 @@ import net.minecraft.entity.effect.StatusEffects;
 import net.minecraft.entity.mob.HostileEntity;
 import net.minecraft.entity.passive.PassiveEntity;
 import net.minecraft.entity.player.PlayerEntity;
+import net.minecraft.item.AxeItem;
+import net.minecraft.item.Item;
+import net.minecraft.item.SwordItem;
+import net.minecraft.item.TridentItem;
 import net.minecraft.network.packet.c2s.play.PlayerInteractEntityC2SPacket;
 import net.minecraft.util.Hand;
 import net.minecraft.util.hit.EntityHitResult;
@@ -16,13 +20,26 @@ import java.util.Random;
 
 public class TriggerBotModule extends Module {
 
+    // === ЗАДЕРЖКИ ===
     public final Setting minDelaySet;
     public final Setting maxDelaySet;
     public final Setting rangeSet;
-    public final Setting noWeaponSet;
-    public final Setting critOnlySet;
+    public final Setting randomizeSet;
+    public final Setting attackModeSet; // 0=1.8, 1=1.9, 2=1.10+
 
-    // Кого атаковать
+    // === КРИТЫ ===
+    public final Setting critOnlySet;
+    public final Setting smartCritsSet;
+    public final Setting maceEarlySet;
+
+    // === АТАКА ===
+    public final Setting throughBlocksSet;
+    public final Setting throughPlayersSet;
+    public final Setting hitWhileEatingSet;
+    public final Setting weaponOnlySet;
+    public final Setting sprintResetSet;
+
+    // === КОГО АТАКОВАТЬ ===
     public final Setting targetPlayersSet;
     public final Setting targetNoArmorSet;
     public final Setting targetMobsSet;
@@ -30,20 +47,33 @@ public class TriggerBotModule extends Module {
     public final Setting targetFriendsSet;
     public final Setting targetInvisibleSet;
 
-    // Атака
-    public final Setting throughWallsSet;
+    // === ДОПОЛНИТЕЛЬНО ===
+    public final Setting noGuiSet;
+    public final Setting focusOneSet;
+    public final Setting hitWhitelistSet;
 
     private long lastAttack = 0;
     private long targetSeenAt = 0;
+    private int currentFocusId = -1;
     private final Random random = new Random();
 
     public TriggerBotModule() {
         super("TriggerBot", "Атака при наведении", "Combat", false);
+        rangeSet = num("Range", 3.0f, 1.0f, 6.0f, 0.1f);
+        attackModeSet = num("Attack Mode", 1f, 0f, 2f, 1f); // 0=1.8, 1=1.9, 2=1.10+
         minDelaySet = num("Min Delay", 60f, 10f, 500f, 5f);
         maxDelaySet = num("Max Delay", 120f, 10f, 500f, 5f);
-        rangeSet = num("Range", 3.0f, 1.0f, 6.0f, 0.1f);
-        noWeaponSet = bool("No Weapon", false);
+        randomizeSet = num("Randomize", 15f, 0f, 100f, 1f);
+
         critOnlySet = bool("Crit Only", false);
+        smartCritsSet = bool("Smart Crits", false);
+        maceEarlySet = bool("Early Mace", false);
+
+        throughBlocksSet = bool("Through Blocks", false);
+        throughPlayersSet = bool("Through Players", false);
+        hitWhileEatingSet = bool("Hit While Eating", false);
+        weaponOnlySet = bool("Weapon Only", true);
+        sprintResetSet = bool("Sprint Reset", false);
 
         targetPlayersSet = bool("Players", true);
         targetNoArmorSet = bool("No Armor", false);
@@ -52,26 +82,32 @@ public class TriggerBotModule extends Module {
         targetFriendsSet = bool("Friends", false);
         targetInvisibleSet = bool("Invisible", false);
 
-        throughWallsSet = bool("Through Walls", false);
+        noGuiSet = bool("No GUI", true);
+        focusOneSet = bool("Focus One", false);
+        hitWhitelistSet = bool("Whitelist", false);
     }
 
     @Override
     public void onTick() {
         MinecraftClient mc = MinecraftClient.getInstance();
         if (mc.player == null || mc.world == null) return;
-        if (mc.currentScreen != null) return;
 
-        // NO WEAPON
-        if (!noWeaponSet.boolValue) {
-            if (!isWeapon(mc)) {
-                targetSeenAt = 0;
-                return;
-            }
+        if (noGuiSet.boolValue && mc.currentScreen != null) return;
+
+        if (!hitWhileEatingSet.boolValue && mc.player.isUsingItem()) {
+            targetSeenAt = 0;
+            return;
+        }
+
+        if (weaponOnlySet.boolValue && !isWeapon(mc)) {
+            targetSeenAt = 0;
+            return;
         }
 
         HitResult hit = mc.crosshairTarget;
         if (hit == null || hit.getType() != HitResult.Type.ENTITY) {
             targetSeenAt = 0;
+            currentFocusId = -1;
             return;
         }
 
@@ -84,88 +120,141 @@ public class TriggerBotModule extends Module {
         if (target == mc.player) return;
         if (!target.isAlive()) return;
 
-        // === Проверка категории цели ===
         if (!isValidTarget(living)) {
             targetSeenAt = 0;
             return;
         }
 
-        // === Через блоки ===
-        if (!throughWallsSet.boolValue) {
-            if (!mc.player.canSee(target)) {
-                targetSeenAt = 0;
-                return;
-            }
+        if (!throughPlayersSet.boolValue && hasPlayerBetween(mc, target)) {
+            targetSeenAt = 0;
+            return;
         }
 
-        // === Дистанция ===
+        if (!throughBlocksSet.boolValue && !mc.player.canSee(target)) {
+            targetSeenAt = 0;
+            return;
+        }
+
         double dist = mc.player.distanceTo(target);
         if (dist > rangeSet.value) {
             targetSeenAt = 0;
             return;
         }
 
-        // === Crit Only ===
-        if (critOnlySet.boolValue) {
-            if (!canCrit(mc)) return;
+        if (focusOneSet.boolValue) {
+            if (currentFocusId == -1) {
+                currentFocusId = target.getId();
+            } else if (currentFocusId != target.getId()) {
+                return;
+            }
         }
 
-        // === Задержка ===
+        if (smartCritsSet.boolValue && mc.player.isOnGround()) {
+            mc.player.jump();
+            return;
+        }
+
+        if (critOnlySet.boolValue && !canCrit(mc)) {
+            return;
+        }
+
+        if (maceEarlySet.boolValue && isMace(mc)) {
+            if (mc.player.fallDistance > 1.5f && !mc.player.isOnGround()) {
+                attack(mc, target);
+                return;
+            }
+        }
+
+        // === РЕЖИМ АТАКИ ===
+        int mode = (int) attackModeSet.value;
         long now = System.currentTimeMillis();
+
+        // 1.9+ — проверяем кулдаун атаки
+        if (mode >= 1) {
+            float cooldown = mc.player.getAttackCooldownProgress(0f);
+            // Ждём пока кулдаун почти полный (0.95+)
+            if (cooldown < 0.95f) {
+                return;
+            }
+        }
+
         if (targetSeenAt == 0) {
             targetSeenAt = now;
             return;
         }
 
-        int minDelay = (int) minDelaySet.value;
-        int maxDelay = (int) maxDelaySet.value;
-        int delay = minDelay + random.nextInt(Math.max(1, maxDelay - minDelay + 1));
+        int minDelay, maxDelay;
 
-        if (now - targetSeenAt < delay) return;
-        if (now - lastAttack < delay) return;
+        if (mode == 0) {
+            // 1.8 — просто CPS, без кулдауна
+            minDelay = (int) minDelaySet.value;
+            maxDelay = (int) maxDelaySet.value;
+        } else if (mode == 1) {
+            // 1.9 — фиксированный CPS под кулдаун (обычно ~12-16)
+            minDelay = 60;
+            maxDelay = 90;
+        } else {
+            // 1.10+ — как 1.9, но чуть быстрее
+            minDelay = 50;
+            maxDelay = 80;
+        }
 
-        // === Удар ===
-        if (mc.getNetworkHandler() != null) {
-            PlayerInteractEntityC2SPacket packet = PlayerInteractEntityC2SPacket.attack(
-                    target, mc.player.isSneaking());
-            mc.getNetworkHandler().sendPacket(packet);
-            mc.player.swingHand(Hand.MAIN_HAND);
-            lastAttack = now;
-            targetSeenAt = now;
+        int baseDelay = minDelay + random.nextInt(Math.max(1, maxDelay - minDelay + 1));
+
+        int randAmount = (int) randomizeSet.value;
+        if (randAmount > 0) {
+            baseDelay += random.nextInt(randAmount * 2) - randAmount;
+        }
+        baseDelay = Math.max(20, baseDelay);
+
+        if (now - targetSeenAt < baseDelay) return;
+        if (now - lastAttack < baseDelay) return;
+
+        attack(mc, target);
+
+        if (sprintResetSet.boolValue) {
+            mc.player.setSprinting(false);
+            mc.player.setSprinting(true);
         }
     }
 
-    private boolean isValidTarget(LivingEntity target) {
-        // Невидимые — отдельная настройка
-        if (target.isInvisible()) {
-            return targetInvisibleSet.boolValue;
+    private void attack(MinecraftClient mc, Entity target) {
+        if (mc.getNetworkHandler() == null) return;
+        PlayerInteractEntityC2SPacket packet = PlayerInteractEntityC2SPacket.attack(
+                target, mc.player.isSneaking());
+        mc.getNetworkHandler().sendPacket(packet);
+        mc.player.swingHand(Hand.MAIN_HAND);
+        lastAttack = System.currentTimeMillis();
+        targetSeenAt = System.currentTimeMillis();
+    }
+
+    private boolean hasPlayerBetween(MinecraftClient mc, Entity target) {
+        var box = mc.player.getBoundingBox().stretch(
+                target.getPos().subtract(mc.player.getPos())).expand(1.0);
+
+        for (Entity e : mc.world.getEntities()) {
+            if (e == mc.player || e == target) continue;
+            if (!(e instanceof PlayerEntity)) continue;
+            if (box.intersects(e.getBoundingBox())) return true;
         }
+        return false;
+    }
 
-        // Игроки
+    private boolean isValidTarget(LivingEntity target) {
+        if (target.isInvisible()) return targetInvisibleSet.boolValue;
+
         if (target instanceof PlayerEntity player) {
-            // Проверка на друзей — пока заглушка (системы друзей нет)
-            boolean isFriend = false; // TODO: добавить систему друзей
-            if (isFriend) {
-                return targetFriendsSet.boolValue;
-            }
+            boolean isFriend = false;
+            if (isFriend) return targetFriendsSet.boolValue;
 
-            // Игроки без брони
             if (!hasArmor(player)) {
                 return targetNoArmorSet.boolValue || targetPlayersSet.boolValue;
             }
-
             return targetPlayersSet.boolValue;
         }
 
-        // Враждебные мобы
-        if (target instanceof HostileEntity) {
-            return targetMobsSet.boolValue;
-        }
-
-        // Животные
-        if (target instanceof PassiveEntity) {
-            return targetAnimalsSet.boolValue;
-        }
+        if (target instanceof HostileEntity) return targetMobsSet.boolValue;
+        if (target instanceof PassiveEntity) return targetAnimalsSet.boolValue;
 
         return false;
     }
@@ -186,10 +275,15 @@ public class TriggerBotModule extends Module {
     }
 
     private boolean isWeapon(MinecraftClient mc) {
-        var item = mc.player.getMainHandStack().getItem();
-        return item instanceof net.minecraft.item.SwordItem
-            || item instanceof net.minecraft.item.AxeItem
-            || item instanceof net.minecraft.item.TridentItem;
+        Item item = mc.player.getMainHandStack().getItem();
+        return item instanceof SwordItem
+            || item instanceof AxeItem
+            || item instanceof TridentItem;
+    }
+
+    private boolean isMace(MinecraftClient mc) {
+        String name = mc.player.getMainHandStack().getItem().toString().toLowerCase();
+        return name.contains("mace");
     }
 
     @Override
@@ -197,5 +291,6 @@ public class TriggerBotModule extends Module {
         super.toggle();
         targetSeenAt = 0;
         lastAttack = 0;
+        currentFocusId = -1;
     }
-    }
+            }
