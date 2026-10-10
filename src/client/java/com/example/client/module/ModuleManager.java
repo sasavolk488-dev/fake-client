@@ -18,6 +18,7 @@ public class ModuleManager {
 
         // COMBAT
         modules.add(new KillAuraModule());
+        modules.add(new TriggerBotModule());
         modules.add(new Module("AutoClicker", "Автокликер", "Combat", false));
         modules.add(new Module("Reach", "Дистанция", "Combat", false));
         modules.add(new Module("Velocity", "Анти-отброс", "Combat", false));
@@ -46,6 +47,7 @@ public class ModuleManager {
             if (m.enabled) {
                 try {
                     if (m instanceof KillAuraModule) ((KillAuraModule) m).onTick();
+                    if (m instanceof TriggerBotModule) ((TriggerBotModule) m).onTick();
                     if (m instanceof AutoSprintModule) ((AutoSprintModule) m).onTick();
                     if (m instanceof FlyModule) ((FlyModule) m).onTick();
                     if (m instanceof SpeedModule) ((SpeedModule) m).onTick();
@@ -63,6 +65,10 @@ public class ModuleManager {
         for (Module m : modules) if (m.category.equals(cat)) list.add(m);
         return list;
     }
+
+    // ==========================================================
+    // ============ ВСТРОЕННЫЕ МОДУЛИ ============
+    // ==========================================================
 
     public static class AutoSprintModule extends Module {
         public AutoSprintModule() {
@@ -145,4 +151,4 @@ public class ModuleManager {
             }
         }
     }
-                    }
+        }
