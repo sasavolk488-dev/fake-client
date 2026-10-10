@@ -2,6 +2,7 @@ package com.example.client.module;
 
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.entity.Entity;
+import net.minecraft.entity.EquipmentSlot;
 import net.minecraft.entity.LivingEntity;
 import net.minecraft.entity.effect.StatusEffects;
 import net.minecraft.entity.mob.HostileEntity;
@@ -20,26 +21,22 @@ import java.util.Random;
 
 public class TriggerBotModule extends Module {
 
-    // === ЗАДЕРЖКИ ===
     public final Setting minDelaySet;
     public final Setting maxDelaySet;
     public final Setting rangeSet;
     public final Setting randomizeSet;
-    public final Setting attackModeSet; // 0=1.8, 1=1.9, 2=1.10+
+    public final Setting attackModeSet;    // 0=1.8, 1=1.9, 2=1.10+
 
-    // === КРИТЫ ===
     public final Setting critOnlySet;
     public final Setting smartCritsSet;
-    public final Setting maceEarlySet;
+    public final Setting earlyMaceSet;
 
-    // === АТАКА ===
     public final Setting throughBlocksSet;
     public final Setting throughPlayersSet;
     public final Setting hitWhileEatingSet;
     public final Setting weaponOnlySet;
     public final Setting sprintResetSet;
 
-    // === КОГО АТАКОВАТЬ ===
     public final Setting targetPlayersSet;
     public final Setting targetNoArmorSet;
     public final Setting targetMobsSet;
@@ -47,10 +44,9 @@ public class TriggerBotModule extends Module {
     public final Setting targetFriendsSet;
     public final Setting targetInvisibleSet;
 
-    // === ДОПОЛНИТЕЛЬНО ===
     public final Setting noGuiSet;
     public final Setting focusOneSet;
-    public final Setting hitWhitelistSet;
+    public final Setting whitelistSet;
 
     private long lastAttack = 0;
     private long targetSeenAt = 0;
@@ -59,15 +55,16 @@ public class TriggerBotModule extends Module {
 
     public TriggerBotModule() {
         super("TriggerBot", "Атака при наведении", "Combat", false);
+
         rangeSet = num("Range", 3.0f, 1.0f, 6.0f, 0.1f);
-        attackModeSet = num("Attack Mode", 1f, 0f, 2f, 1f); // 0=1.8, 1=1.9, 2=1.10+
+        attackModeSet = num("Attack Mode", 1f, 0f, 2f, 1f);
         minDelaySet = num("Min Delay", 60f, 10f, 500f, 5f);
         maxDelaySet = num("Max Delay", 120f, 10f, 500f, 5f);
         randomizeSet = num("Randomize", 15f, 0f, 100f, 1f);
 
         critOnlySet = bool("Crit Only", false);
         smartCritsSet = bool("Smart Crits", false);
-        maceEarlySet = bool("Early Mace", false);
+        earlyMaceSet = bool("Early Mace", false);
 
         throughBlocksSet = bool("Through Blocks", false);
         throughPlayersSet = bool("Through Players", false);
@@ -84,7 +81,7 @@ public class TriggerBotModule extends Module {
 
         noGuiSet = bool("No GUI", true);
         focusOneSet = bool("Focus One", false);
-        hitWhitelistSet = bool("Whitelist", false);
+        whitelistSet = bool("Whitelist", false);
     }
 
     @Override
@@ -92,18 +89,22 @@ public class TriggerBotModule extends Module {
         MinecraftClient mc = MinecraftClient.getInstance();
         if (mc.player == null || mc.world == null) return;
 
+        // Не бить в GUI
         if (noGuiSet.boolValue && mc.currentScreen != null) return;
 
+        // Бить пока ешь
         if (!hitWhileEatingSet.boolValue && mc.player.isUsingItem()) {
             targetSeenAt = 0;
             return;
         }
 
+        // Weapon Only
         if (weaponOnlySet.boolValue && !isWeapon(mc)) {
             targetSeenAt = 0;
             return;
         }
 
+        // Смотрим что в прицеле
         HitResult hit = mc.crosshairTarget;
         if (hit == null || hit.getType() != HitResult.Type.ENTITY) {
             targetSeenAt = 0;
@@ -112,7 +113,6 @@ public class TriggerBotModule extends Module {
         }
 
         Entity target = ((EntityHitResult) hit).getEntity();
-
         if (!(target instanceof LivingEntity living)) {
             targetSeenAt = 0;
             return;
@@ -120,62 +120,61 @@ public class TriggerBotModule extends Module {
         if (target == mc.player) return;
         if (!target.isAlive()) return;
 
+        // Кого атакуем
         if (!isValidTarget(living)) {
             targetSeenAt = 0;
             return;
         }
 
+        // Через игроков
         if (!throughPlayersSet.boolValue && hasPlayerBetween(mc, target)) {
             targetSeenAt = 0;
             return;
         }
 
+        // Через блоки
         if (!throughBlocksSet.boolValue && !mc.player.canSee(target)) {
             targetSeenAt = 0;
             return;
         }
 
-        double dist = mc.player.distanceTo(target);
-        if (dist > rangeSet.value) {
+        // Дистанция
+        if (mc.player.distanceTo(target) > rangeSet.value) {
             targetSeenAt = 0;
             return;
         }
 
+        // Фокус на одном
         if (focusOneSet.boolValue) {
-            if (currentFocusId == -1) {
-                currentFocusId = target.getId();
-            } else if (currentFocusId != target.getId()) {
-                return;
-            }
+            if (currentFocusId == -1) currentFocusId = target.getId();
+            else if (currentFocusId != target.getId()) return;
         }
 
-        if (smartCritsSet.boolValue && mc.player.isOnGround()) {
+        // Умные криты (прыжок)
+        if (smartCritsSet.boolValue && mc.player.isOnGround() && mc.player.isSprinting() == false) {
             mc.player.jump();
             return;
         }
 
-        if (critOnlySet.boolValue && !canCrit(mc)) {
-            return;
-        }
+        // Только криты
+        if (critOnlySet.boolValue && !canCrit(mc)) return;
 
-        if (maceEarlySet.boolValue && isMace(mc)) {
+        // Ранний удар булавой
+        if (earlyMaceSet.boolValue && isMace(mc)) {
             if (mc.player.fallDistance > 1.5f && !mc.player.isOnGround()) {
                 attack(mc, target);
                 return;
             }
         }
 
-        // === РЕЖИМ АТАКИ ===
+        // Режим атаки
         int mode = (int) attackModeSet.value;
         long now = System.currentTimeMillis();
 
-        // 1.9+ — проверяем кулдаун атаки
+        // 1.9+ — ждём кулдаун
         if (mode >= 1) {
             float cooldown = mc.player.getAttackCooldownProgress(0f);
-            // Ждём пока кулдаун почти полный (0.95+)
-            if (cooldown < 0.95f) {
-                return;
-            }
+            if (cooldown < 0.95f) return;
         }
 
         if (targetSeenAt == 0) {
@@ -184,31 +183,25 @@ public class TriggerBotModule extends Module {
         }
 
         int minDelay, maxDelay;
-
         if (mode == 0) {
-            // 1.8 — просто CPS, без кулдауна
             minDelay = (int) minDelaySet.value;
             maxDelay = (int) maxDelaySet.value;
         } else if (mode == 1) {
-            // 1.9 — фиксированный CPS под кулдаун (обычно ~12-16)
             minDelay = 60;
             maxDelay = 90;
         } else {
-            // 1.10+ — как 1.9, но чуть быстрее
             minDelay = 50;
             maxDelay = 80;
         }
 
-        int baseDelay = minDelay + random.nextInt(Math.max(1, maxDelay - minDelay + 1));
+        int delay = minDelay + random.nextInt(Math.max(1, maxDelay - minDelay + 1));
 
-        int randAmount = (int) randomizeSet.value;
-        if (randAmount > 0) {
-            baseDelay += random.nextInt(randAmount * 2) - randAmount;
-        }
-        baseDelay = Math.max(20, baseDelay);
+        int randAmt = (int) randomizeSet.value;
+        if (randAmt > 0) delay += random.nextInt(randAmt * 2) - randAmt;
+        delay = Math.max(20, delay);
 
-        if (now - targetSeenAt < baseDelay) return;
-        if (now - lastAttack < baseDelay) return;
+        if (now - targetSeenAt < delay) return;
+        if (now - lastAttack < delay) return;
 
         attack(mc, target);
 
@@ -220,17 +213,18 @@ public class TriggerBotModule extends Module {
 
     private void attack(MinecraftClient mc, Entity target) {
         if (mc.getNetworkHandler() == null) return;
-        PlayerInteractEntityC2SPacket packet = PlayerInteractEntityC2SPacket.attack(
-                target, mc.player.isSneaking());
-        mc.getNetworkHandler().sendPacket(packet);
+        mc.getNetworkHandler().sendPacket(
+                PlayerInteractEntityC2SPacket.attack(target, mc.player.isSneaking())
+        );
         mc.player.swingHand(Hand.MAIN_HAND);
         lastAttack = System.currentTimeMillis();
         targetSeenAt = System.currentTimeMillis();
     }
 
     private boolean hasPlayerBetween(MinecraftClient mc, Entity target) {
-        var box = mc.player.getBoundingBox().stretch(
-                target.getPos().subtract(mc.player.getPos())).expand(1.0);
+        var box = mc.player.getBoundingBox()
+                .stretch(target.getPos().subtract(mc.player.getPos()))
+                .expand(1.0);
 
         for (Entity e : mc.world.getEntities()) {
             if (e == mc.player || e == target) continue;
@@ -244,26 +238,23 @@ public class TriggerBotModule extends Module {
         if (target.isInvisible()) return targetInvisibleSet.boolValue;
 
         if (target instanceof PlayerEntity player) {
-            boolean isFriend = false;
+            boolean isFriend = false; // TODO: система друзей
             if (isFriend) return targetFriendsSet.boolValue;
 
-            if (!hasArmor(player)) {
-                return targetNoArmorSet.boolValue || targetPlayersSet.boolValue;
-            }
+            if (!hasArmor(player)) return targetNoArmorSet.boolValue || targetPlayersSet.boolValue;
             return targetPlayersSet.boolValue;
         }
 
         if (target instanceof HostileEntity) return targetMobsSet.boolValue;
         if (target instanceof PassiveEntity) return targetAnimalsSet.boolValue;
-
         return false;
     }
 
     private boolean hasArmor(PlayerEntity player) {
-        return !player.getEquippedStack(net.minecraft.entity.EquipmentSlot.HEAD).isEmpty()
-            || !player.getEquippedStack(net.minecraft.entity.EquipmentSlot.CHEST).isEmpty()
-            || !player.getEquippedStack(net.minecraft.entity.EquipmentSlot.LEGS).isEmpty()
-            || !player.getEquippedStack(net.minecraft.entity.EquipmentSlot.FEET).isEmpty();
+        return !player.getEquippedStack(EquipmentSlot.HEAD).isEmpty()
+            || !player.getEquippedStack(EquipmentSlot.CHEST).isEmpty()
+            || !player.getEquippedStack(EquipmentSlot.LEGS).isEmpty()
+            || !player.getEquippedStack(EquipmentSlot.FEET).isEmpty();
     }
 
     private boolean canCrit(MinecraftClient mc) {
@@ -282,8 +273,8 @@ public class TriggerBotModule extends Module {
     }
 
     private boolean isMace(MinecraftClient mc) {
-        String name = mc.player.getMainHandStack().getItem().toString().toLowerCase();
-        return name.contains("mace");
+        String n = mc.player.getMainHandStack().getItem().toString().toLowerCase();
+        return n.contains("mace");
     }
 
     @Override
