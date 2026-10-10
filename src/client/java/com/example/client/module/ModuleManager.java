@@ -16,27 +16,28 @@ public class ModuleManager {
     public static void init() {
         modules.clear();
 
-        // COMBAT
+        // === COMBAT ===
         modules.add(new KillAuraModule());
+        modules.add(new RotationModule());
         modules.add(new TriggerBotModule());
         modules.add(new Module("AutoClicker", "Автокликер", "Combat", false));
         modules.add(new Module("Reach", "Дистанция", "Combat", false));
         modules.add(new Module("Velocity", "Анти-отброс", "Combat", false));
         modules.add(new Module("Criticals", "Криты", "Combat", false));
 
-        // MOVEMENT
+        // === MOVEMENT ===
         modules.add(new AutoSprintModule());
         modules.add(new FlyModule());
         modules.add(new SpeedModule());
         modules.add(new NoFallModule());
 
-        // RENDER
+        // === RENDER ===
         modules.add(new EspModule());
         modules.add(new FullbrightModule());
         modules.add(new Module("Tracers", "Линии", "Render", false));
         modules.add(new Module("Xray", "Прозрачные блоки", "Render", false));
 
-        // MISC
+        // === MISC ===
         modules.add(new Module("Hud", "HUD", "Misc", true));
         modules.add(new Module("AntiAFK", "Анти-AFK", "Misc", false));
         modules.add(new Module("NameProtect", "Скрыть ник", "Misc", false));
@@ -47,6 +48,7 @@ public class ModuleManager {
             if (m.enabled) {
                 try {
                     if (m instanceof KillAuraModule) ((KillAuraModule) m).onTick();
+                    if (m instanceof RotationModule) ((RotationModule) m).onTick();
                     if (m instanceof TriggerBotModule) ((TriggerBotModule) m).onTick();
                     if (m instanceof AutoSprintModule) ((AutoSprintModule) m).onTick();
                     if (m instanceof FlyModule) ((FlyModule) m).onTick();
@@ -66,14 +68,15 @@ public class ModuleManager {
         return list;
     }
 
-    // ==========================================================
-    // ============ ВСТРОЕННЫЕ МОДУЛИ ============
-    // ==========================================================
+    // ============================================================
+    // ==================== ВСТРОЕННЫЕ МОДУЛИ =====================
+    // ============================================================
 
     public static class AutoSprintModule extends Module {
         public AutoSprintModule() {
             super("AutoSprint", "Автоспринт", "Movement", true);
         }
+
         public void onTick() {
             MinecraftClient mc = MinecraftClient.getInstance();
             if (mc.player == null) return;
@@ -89,6 +92,7 @@ public class ModuleManager {
         public EspModule() {
             super("ESP", "Подсветка игроков", "Render", true);
         }
+
         public void onTick() {
             MinecraftClient mc = MinecraftClient.getInstance();
             if (mc.world == null) return;
@@ -104,8 +108,10 @@ public class ModuleManager {
         public FullbrightModule() {
             super("Fullbright", "Яркость", "Render", true);
         }
+
         public void onTick() {
             MinecraftClient mc = MinecraftClient.getInstance();
+            if (mc.options == null) return;
             mc.options.getGamma().setValue(100.0);
         }
     }
@@ -114,6 +120,7 @@ public class ModuleManager {
         public NoFallModule() {
             super("NoFall", "Без урона", "Movement", false);
         }
+
         public void onTick() {
             MinecraftClient mc = MinecraftClient.getInstance();
             if (mc.player == null) return;
@@ -125,6 +132,7 @@ public class ModuleManager {
         public SpeedModule() {
             super("Speed", "Ускорение", "Movement", false);
         }
+
         public void onTick() {
             MinecraftClient mc = MinecraftClient.getInstance();
             if (mc.player == null) return;
@@ -137,6 +145,7 @@ public class ModuleManager {
         public FlyModule() {
             super("Fly", "Полёт", "Movement", false);
         }
+
         public void onTick() {
             MinecraftClient mc = MinecraftClient.getInstance();
             if (mc.player == null) return;
@@ -151,4 +160,4 @@ public class ModuleManager {
             }
         }
     }
-        }
+    }
