@@ -25,7 +25,6 @@ public class TriggerBotModule extends Module {
     public final Setting maxDelaySet;
     public final Setting rangeSet;
     public final Setting randomizeSet;
-    public final Setting attackModeSet;    // 0=1.8, 1=1.9, 2=1.10+
 
     public final Setting critOnlySet;
     public final Setting smartCritsSet;
@@ -57,7 +56,6 @@ public class TriggerBotModule extends Module {
         super("TriggerBot", "Атака при наведении", "Combat", false);
 
         rangeSet = num("Range", 3.0f, 1.0f, 6.0f, 0.1f);
-        attackModeSet = num("Attack Mode", 1f, 0f, 2f, 1f);
         minDelaySet = num("Min Delay", 60f, 10f, 500f, 5f);
         maxDelaySet = num("Max Delay", 120f, 10f, 500f, 5f);
         randomizeSet = num("Randomize", 15f, 0f, 100f, 1f);
@@ -104,7 +102,7 @@ public class TriggerBotModule extends Module {
             return;
         }
 
-        // Смотрим что в прицеле
+        // Луч в прицеле
         HitResult hit = mc.crosshairTarget;
         if (hit == null || hit.getType() != HitResult.Type.ENTITY) {
             targetSeenAt = 0;
@@ -120,7 +118,6 @@ public class TriggerBotModule extends Module {
         if (target == mc.player) return;
         if (!target.isAlive()) return;
 
-        // Кого атакуем
         if (!isValidTarget(living)) {
             targetSeenAt = 0;
             return;
@@ -150,8 +147,8 @@ public class TriggerBotModule extends Module {
             else if (currentFocusId != target.getId()) return;
         }
 
-        // Умные криты (прыжок)
-        if (smartCritsSet.boolValue && mc.player.isOnGround() && mc.player.isSprinting() == false) {
+        // Умные криты — авто-прыжок
+        if (smartCritsSet.boolValue && mc.player.isOnGround()) {
             mc.player.jump();
             return;
         }
@@ -167,33 +164,18 @@ public class TriggerBotModule extends Module {
             }
         }
 
-        // Режим атаки
-        int mode = (int) attackModeSet.value;
+        // === 1.9 кулдаун (всегда) ===
+        float cooldown = mc.player.getAttackCooldownProgress(0f);
+        if (cooldown < 0.95f) return;
+
         long now = System.currentTimeMillis();
-
-        // 1.9+ — ждём кулдаун
-        if (mode >= 1) {
-            float cooldown = mc.player.getAttackCooldownProgress(0f);
-            if (cooldown < 0.95f) return;
-        }
-
         if (targetSeenAt == 0) {
             targetSeenAt = now;
             return;
         }
 
-        int minDelay, maxDelay;
-        if (mode == 0) {
-            minDelay = (int) minDelaySet.value;
-            maxDelay = (int) maxDelaySet.value;
-        } else if (mode == 1) {
-            minDelay = 60;
-            maxDelay = 90;
-        } else {
-            minDelay = 50;
-            maxDelay = 80;
-        }
-
+        int minDelay = (int) minDelaySet.value;
+        int maxDelay = (int) maxDelaySet.value;
         int delay = minDelay + random.nextInt(Math.max(1, maxDelay - minDelay + 1));
 
         int randAmt = (int) randomizeSet.value;
@@ -238,7 +220,7 @@ public class TriggerBotModule extends Module {
         if (target.isInvisible()) return targetInvisibleSet.boolValue;
 
         if (target instanceof PlayerEntity player) {
-            boolean isFriend = false; // TODO: система друзей
+            boolean isFriend = false;
             if (isFriend) return targetFriendsSet.boolValue;
 
             if (!hasArmor(player)) return targetNoArmorSet.boolValue || targetPlayersSet.boolValue;
@@ -284,4 +266,4 @@ public class TriggerBotModule extends Module {
         lastAttack = 0;
         currentFocusId = -1;
     }
-            }
+    }
