@@ -13,13 +13,9 @@ public class ClickGuiScreen extends Screen {
 
     private static final int W = 400;
     private static final int H = 250;
-    private static final int HEADER_H = 26;
     private static final int SIDEBAR_W = 90;
-    private static final int ROW_H = 22;
-    private static final int ROW_GAP = 5;
-    private static final int COL_GAP = 5;
-    private static final int SETTINGS_W = 220;
-    private static final int SETTINGS_ROW_H = 26;
+    private static final int MIDDLE_W = 140;
+    private static final int RIGHT_W = W - SIDEBAR_W - MIDDLE_W - 2;
 
     private static final int C_BG          = 0xF00D0D14;
     private static final int C_SIDEBAR     = 0xFF0A0A10;
@@ -40,10 +36,6 @@ public class ClickGuiScreen extends Screen {
     private static final int C_BIND_HOVER  = 0xFF2A2A40;
     private static final int C_BIND_ACTIVE = 0xFF3BB8F0;
 
-    private static final int SIDEBAR_MID = 90;
-    private static final int MIDDLE_W = 140;
-    private static final int RIGHT_W = W - SIDEBAR_W - MIDDLE_W - 2;
-
     private float guiX = 0;
     private float guiY = 0;
 
@@ -51,13 +43,16 @@ public class ClickGuiScreen extends Screen {
     private static final String[] CATS = {"Combat", "Movement", "Render", "Player", "Utilities", "Themes", "Configs"};
 
     private Module selectedModule = null;
-    private Module bindingModule = null; // для какой карточки ждём клавишу
+    private Module bindingModule = null;
     private boolean dragging = false;
     private double dragOffX, dragOffY;
     private long openTime;
 
     private Module.Setting dragSlider = null;
     private int dragSliderX = 0, dragSliderW = 0;
+
+    // Скролл правой панели
+    private int rightScroll = 0;
 
     public ClickGuiScreen() {
         super(Text.literal("ClickGUI"));
@@ -98,7 +93,6 @@ public class ClickGuiScreen extends Screen {
 
         drawWindow(ctx, mouseX, mouseY);
 
-        // Окно ожидания клавиши
         if (bindingModule != null) drawBindOverlay(ctx);
 
         ctx.getMatrices().pop();
@@ -169,18 +163,14 @@ public class ClickGuiScreen extends Screen {
             boolean hover = mouseX >= mx && mouseX <= mx + MIDDLE_W && mouseY >= ry && mouseY <= ry + 20;
             boolean isSelected = (selectedModule == m);
 
-            if (isSelected) {
-                ctx.fill(mx, ry, mx + MIDDLE_W, ry + 20, C_ROW_ACTIVE);
-            } else if (hover) {
-                ctx.fill(mx, ry, mx + MIDDLE_W, ry + 20, C_ROW_HOVER);
-            }
+            if (isSelected) ctx.fill(mx, ry, mx + MIDDLE_W, ry + 20, C_ROW_ACTIVE);
+            else if (hover) ctx.fill(mx, ry, mx + MIDDLE_W, ry + 20, C_ROW_HOVER);
 
             int tc = m.enabled ? C_TEXT : C_TEXT_DIM;
             ctx.drawTextWithShadow(textRenderer, Text.literal(m.name), mx + 8, ry + 6, tc);
 
-            // BIND кнопка (слева от тумблера)
-            int bindW = 22;
-            int bindH = 12;
+            // BIND
+            int bindW = 22, bindH = 12;
             int bindX = mx + MIDDLE_W - 22 - bindW - 6;
             int bindY = ry + 4;
 
@@ -197,7 +187,7 @@ public class ClickGuiScreen extends Screen {
             ctx.drawTextWithShadow(textRenderer, Text.literal(bindText),
                     bindX + (bindW - tw) / 2, bindY + 2, bindTextColor);
 
-            // Toggle
+            // TOGGLE
             int tr = 5;
             int tx = mx + MIDDLE_W - 12;
             int ty = ry + 10;
@@ -221,51 +211,85 @@ public class ClickGuiScreen extends Screen {
         ctx.fill(rx, y + 20, rx + RIGHT_W, y + 21, C_BORDER);
 
         if (selectedModule != null && !selectedModule.settings.isEmpty()) {
-            int ry2 = y + 28;
+            // === ПРОКРУТКА: ограничиваем область ===
+            int panelTop = y + 24;
+            int panelBottom = y + H - 4;
+            int panelHeight = panelBottom - panelTop;
+
+            // Максимальная высота контента
+            int contentHeight = 0;
             for (Module.Setting s : selectedModule.settings) {
-                if (ry2 + 24 > y + H - 4) break;
+                contentHeight += s.isBool ? 24 : 32;
+            }
 
+            // Максимальный скролл
+            int maxScroll = Math.max(0, contentHeight - panelHeight);
+            if (rightScroll > maxScroll) rightScroll = maxScroll;
+            if (rightScroll < 0) rightScroll = 0;
+
+            // Обрезаем область
+            ctx.enableScissor(rx, panelTop, rx + RIGHT_W, panelBottom);
+
+            int ry2 = panelTop - rightScroll;
+            for (Module.Setting s : selectedModule.settings) {
                 if (s.isBool) {
-                    ctx.drawTextWithShadow(textRenderer, Text.literal(s.name), rx + 8, ry2 + 4, C_TEXT);
+                    if (ry2 + 24 >= panelTop && ry2 <= panelBottom) {
+                        ctx.drawTextWithShadow(textRenderer, Text.literal(s.name), rx + 8, ry2 + 4, C_TEXT);
 
-                    int tr = 5;
-                    int tx = rx + RIGHT_W - 12;
-                    int ty = ry2 + 9;
+                        int tr = 5;
+                        int tx = rx + RIGHT_W - 12;
+                        int ty = ry2 + 9;
 
-                    ctx.fill(tx - tr, ty - tr, tx + tr, ty + tr, s.boolValue ? C_ACCENT : C_TOGGLE_OFF);
+                        ctx.fill(tx - tr, ty - tr, tx + tr, ty + tr, s.boolValue ? C_ACCENT : C_TOGGLE_OFF);
 
-                    if (s.boolValue) {
-                        ctx.fill(tx - 2, ty, tx - 1, ty + 2, 0xFFFFFFFF);
-                        ctx.fill(tx - 1, ty + 1, tx, ty + 3, 0xFFFFFFFF);
-                        ctx.fill(tx, ty, tx + 1, ty + 2, 0xFFFFFFFF);
-                        ctx.fill(tx + 1, ty - 1, tx + 2, ty + 1, 0xFFFFFFFF);
+                        if (s.boolValue) {
+                            ctx.fill(tx - 2, ty, tx - 1, ty + 2, 0xFFFFFFFF);
+                            ctx.fill(tx - 1, ty + 1, tx, ty + 3, 0xFFFFFFFF);
+                            ctx.fill(tx, ty, tx + 1, ty + 2, 0xFFFFFFFF);
+                            ctx.fill(tx + 1, ty - 1, tx + 2, ty + 1, 0xFFFFFFFF);
+                        }
                     }
                     ry2 += 24;
                 } else {
-                    ctx.drawTextWithShadow(textRenderer, Text.literal(s.name), rx + 8, ry2, C_TEXT);
+                    if (ry2 + 32 >= panelTop && ry2 <= panelBottom) {
+                        ctx.drawTextWithShadow(textRenderer, Text.literal(s.name), rx + 8, ry2, C_TEXT);
 
-                    String valStr = (s.step >= 1f) ? String.valueOf((int) s.value) : String.format("%.1f", s.value);
-                    int vw = textRenderer.getWidth(valStr);
-                    ctx.drawTextWithShadow(textRenderer, Text.literal(valStr), rx + RIGHT_W - 8 - vw, ry2, C_ACCENT);
+                        String valStr = (s.step >= 1f) ? String.valueOf((int) s.value) : String.format("%.1f", s.value);
+                        int vw = textRenderer.getWidth(valStr);
+                        ctx.drawTextWithShadow(textRenderer, Text.literal(valStr), rx + RIGHT_W - 8 - vw, ry2, C_ACCENT);
 
-                    int barY = ry2 + 14;
-                    int barX = rx + 8;
-                    int barW = RIGHT_W - 16;
-                    int barH = 3;
+                        int barY = ry2 + 14;
+                        int barX = rx + 8;
+                        int barW = RIGHT_W - 16;
+                        int barH = 3;
 
-                    ctx.fill(barX, barY, barX + barW, barY + barH, C_SLIDER_BG);
+                        ctx.fill(barX, barY, barX + barW, barY + barH, C_SLIDER_BG);
 
-                    float pct = (s.value - s.min) / (s.max - s.min);
-                    int fillW = (int) (barW * pct);
-                    ctx.fill(barX, barY, barX + fillW, barY + barH, C_ACCENT);
+                        float pct = (s.value - s.min) / (s.max - s.min);
+                        int fillW = (int) (barW * pct);
+                        ctx.fill(barX, barY, barX + fillW, barY + barH, C_ACCENT);
 
-                    int kx = barX + fillW;
-                    int ky = barY + barH / 2;
-                    ctx.fill(kx - 4, ky - 4, kx + 4, ky + 4, C_ACCENT);
-                    ctx.fill(kx - 2, ky - 2, kx + 2, ky + 2, 0xFFFFFFFF);
-
+                        int kx = barX + fillW;
+                        int ky = barY + barH / 2;
+                        ctx.fill(kx - 4, ky - 4, kx + 4, ky + 4, C_ACCENT);
+                        ctx.fill(kx - 2, ky - 2, kx + 2, ky + 2, 0xFFFFFFFF);
+                    }
                     ry2 += 32;
                 }
+            }
+
+            ctx.disableScissor();
+
+            // Полоса скролла
+            if (maxScroll > 0) {
+                int sbX = rx + RIGHT_W - 3;
+                int sbY = panelTop;
+                int sbH = panelHeight;
+                int thumbH = Math.max(20, sbH * panelHeight / contentHeight);
+                int thumbY = sbY + (int) ((float) rightScroll / maxScroll * (sbH - thumbH));
+
+                ctx.fill(sbX, sbY, sbX + 2, sbY + sbH, 0xFF1A1A28);
+                ctx.fill(sbX, thumbY, sbX + 2, thumbY + thumbH, C_ACCENT);
             }
         } else {
             ctx.drawTextWithShadow(textRenderer, Text.literal("Выбери модуль"),
@@ -276,10 +300,8 @@ public class ClickGuiScreen extends Screen {
     }
 
     private void drawBindOverlay(DrawContext ctx) {
-        // Затемнение
         ctx.fill(0, 0, width, height, 0xA0000000);
 
-        // Окно
         int bw = 220, bh = 70;
         int bx = (width - bw) / 2;
         int by = (height - bh) / 2;
@@ -299,7 +321,6 @@ public class ClickGuiScreen extends Screen {
     private String getKeyName(int key) {
         String name = GLFW.glfwGetKeyName(key, 0);
         if (name != null) return name.toUpperCase();
-        // Спец-клавиши
         switch (key) {
             case GLFW.GLFW_KEY_SPACE: return "SPC";
             case GLFW.GLFW_KEY_LEFT_SHIFT: return "LSH";
@@ -310,57 +331,76 @@ public class ClickGuiScreen extends Screen {
             case GLFW.GLFW_KEY_RIGHT_ALT: return "RAL";
             case GLFW.GLFW_KEY_TAB: return "TAB";
             case GLFW.GLFW_KEY_ENTER: return "ENT";
-            case GLFW.GLFW_KEY_BACKSPACE: return "BCK";
-            case GLFW.GLFW_KEY_UP: return "UP";
-            case GLFW.GLFW_KEY_DOWN: return "DWN";
-            case GLFW.GLFW_KEY_LEFT: return "LFT";
-            case GLFW.GLFW_KEY_RIGHT: return "RGT";
             default: return "K" + key;
         }
     }
 
     @Override
+    public boolean mouseScrolled(double mx, double my, double amount, double vertical) {
+        int x = (int) guiX;
+        int y = (int) guiY;
+        int mx2 = x + SIDEBAR_W + 1;
+        int rx = mx2 + MIDDLE_W + 1;
+
+        // Скролл только если курсор в правой панели и есть выбранный модуль
+        if (selectedModule != null && mx >= rx && mx <= rx + RIGHT_W
+                && my >= y + 24 && my <= y + H - 4) {
+            rightScroll -= (int)(vertical * 15);
+            if (rightScroll < 0) rightScroll = 0;
+            return true;
+        }
+
+        return super.mouseScrolled(mx, my, amount, vertical);
+    }
+
+    @Override
     public boolean mouseClicked(double mx, double my, int button) {
-        // Если ждём клавишу — ЛЮБОЙ клик = отмена
         if (bindingModule != null) {
             bindingModule = null;
             return true;
         }
 
-        // Настройки открыты
+        // Настройки открыты — проверяем клики по слайдерам/тумблерам
         if (selectedModule != null && button == 0) {
             int x = (int) guiX;
             int y = (int) guiY;
             int mx2 = x + SIDEBAR_W + 1;
             int rx = mx2 + MIDDLE_W + 1;
 
-            int ry2 = y + 28;
-            for (Module.Setting s : selectedModule.settings) {
-                if (ry2 + 24 > y + H - 4) break;
+            int panelTop = y + 24;
+            int panelBottom = y + H - 4;
 
-                if (s.isBool) {
-                    int tx = rx + RIGHT_W - 12;
-                    int ty = ry2 + 9;
-                    if (mx >= tx - 8 && mx <= tx + 8 && my >= ty - 8 && my <= ty + 8) {
-                        s.inc();
-                        return true;
+            if (mx >= rx && mx <= rx + RIGHT_W && my >= panelTop && my <= panelBottom) {
+                int ry2 = panelTop - rightScroll;
+                for (Module.Setting s : selectedModule.settings) {
+                    if (s.isBool) {
+                        if (ry2 + 24 >= panelTop && ry2 <= panelBottom) {
+                            int tx = rx + RIGHT_W - 12;
+                            int ty = ry2 + 9;
+                            if (mx >= tx - 8 && mx <= tx + 8 && my >= ty - 8 && my <= ty + 8) {
+                                s.inc();
+                                return true;
+                            }
+                        }
+                        ry2 += 24;
+                    } else {
+                        if (ry2 + 32 >= panelTop && ry2 <= panelBottom) {
+                            int barX = rx + 8;
+                            int barW = RIGHT_W - 16;
+                            int barY = ry2 + 14;
+                            if (my >= barY - 6 && my <= barY + 6 && mx >= barX && mx <= barX + barW) {
+                                float pct = (float)(mx - barX) / barW;
+                                pct = Math.max(0f, Math.min(1f, pct));
+                                s.value = s.min + pct * (s.max - s.min);
+                                s.value = Math.round(s.value / s.step) * s.step;
+                                dragSlider = s;
+                                dragSliderX = barX;
+                                dragSliderW = barW;
+                                return true;
+                            }
+                        }
+                        ry2 += 32;
                     }
-                    ry2 += 24;
-                } else {
-                    int barX = rx + 8;
-                    int barW = RIGHT_W - 16;
-                    int barY = ry2 + 14;
-                    if (my >= barY - 6 && my <= barY + 6 && mx >= barX && mx <= barX + barW) {
-                        float pct = (float)(mx - barX) / barW;
-                        pct = Math.max(0f, Math.min(1f, pct));
-                        s.value = s.min + pct * (s.max - s.min);
-                        s.value = Math.round(s.value / s.step) * s.step;
-                        dragSlider = s;
-                        dragSliderX = barX;
-                        dragSliderW = barW;
-                        return true;
-                    }
-                    ry2 += 32;
                 }
             }
         }
@@ -374,6 +414,7 @@ public class ClickGuiScreen extends Screen {
             if (mx >= x && mx <= x + SIDEBAR_W && my >= cy2 && my <= cy2 + 18) {
                 selectedCategory = i;
                 selectedModule = null;
+                rightScroll = 0;
                 return true;
             }
         }
@@ -388,31 +429,25 @@ public class ClickGuiScreen extends Screen {
             if (mx >= mx2 && mx <= mx2 + MIDDLE_W && my >= ry && my <= ry + 20) {
                 Module m = mods.get(i);
 
-                // BIND кнопка
                 int bindW = 22, bindH = 12;
                 int bindX = mx2 + MIDDLE_W - 22 - bindW - 6;
                 int bindY = ry + 4;
 
                 if (mx >= bindX && mx <= bindX + bindW && my >= bindY && my <= bindY + bindH) {
-                    // ПКМ — сбросить бинд, ЛКМ — назначить
-                    if (button == 1) {
-                        m.bindKey = -1;
-                    } else {
-                        bindingModule = m;
-                    }
+                    if (button == 1) m.bindKey = -1;
+                    else bindingModule = m;
                     return true;
                 }
 
-                // Toggle
                 int tx = mx2 + MIDDLE_W - 12;
                 if (mx >= tx - 8 && mx <= tx + 8) {
                     m.toggle();
                     return true;
                 }
 
-                // Клик по строке → выбрать для настроек
                 if (!m.settings.isEmpty()) {
                     selectedModule = m;
+                    rightScroll = 0;
                 } else {
                     m.toggle();
                 }
@@ -458,13 +493,11 @@ public class ClickGuiScreen extends Screen {
 
     @Override
     public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
-        // Ожидание клавиши для бинда
         if (bindingModule != null) {
             if (keyCode == GLFW.GLFW_KEY_ESCAPE) {
                 bindingModule = null;
                 return true;
             }
-            // Записываем бинд
             bindingModule.bindKey = keyCode;
             bindingModule = null;
             return true;
@@ -476,4 +509,4 @@ public class ClickGuiScreen extends Screen {
         }
         return super.keyPressed(keyCode, scanCode, modifiers);
     }
-    }
+            }
