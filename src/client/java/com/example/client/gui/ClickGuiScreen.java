@@ -40,7 +40,11 @@ public class ClickGuiScreen extends Screen {
     private float guiY = 0;
 
     private int selectedCategory = 0;
-    private static final String[] CATS = {"Combat", "Movement", "Render", "Player", "Utilities", "Themes", "Configs"};
+
+    // Категории на русском
+    private static final String[] CATS = {
+            "Бой", "Движение", "Визуал", "Игрок", "Утилиты", "Темы", "Конфиги"
+    };
 
     private Module selectedModule = null;
     private Module bindingModule = null;
@@ -51,7 +55,6 @@ public class ClickGuiScreen extends Screen {
     private Module.Setting dragSlider = null;
     private int dragSliderX = 0, dragSliderW = 0;
 
-    // Скролл правой панели
     private int rightScroll = 0;
 
     public ClickGuiScreen() {
@@ -105,7 +108,7 @@ public class ClickGuiScreen extends Screen {
         ctx.fill(x + 4, y + 5, x + W + 4, y + H + 5, 0x80000000);
         ctx.fill(x, y, x + W, y + H, C_BG);
 
-        // SIDEBAR
+        // === SIDEBAR ===
         ctx.fill(x, y, x + SIDEBAR_W, y + H, C_SIDEBAR);
         ctx.fill(x + SIDEBAR_W, y, x + SIDEBAR_W + 1, y + H, C_BORDER);
 
@@ -137,17 +140,18 @@ public class ClickGuiScreen extends Screen {
             ctx.drawTextWithShadow(textRenderer, Text.literal(CATS[i]), x + 24, cy2 + 5, tc);
         }
 
+        // Поиск
         int sy = y + H - 22;
         ctx.fill(x + 4, sy, x + SIDEBAR_W - 4, sy + 16, C_SEARCH_BG);
         ctx.drawTextWithShadow(textRenderer, Text.literal("Поиск..."), x + 10, sy + 4, C_TEXT_DIM);
 
-        // MIDDLE
+        // === MIDDLE (список модулей) ===
         int mx = x + SIDEBAR_W + 1;
         ctx.fill(mx, y, mx + MIDDLE_W, y + H, C_MIDDLE);
 
         ctx.drawTextWithShadow(textRenderer, Text.literal(CATS[selectedCategory]), mx + 8, y + 7, C_TEXT);
 
-        List<Module> mods = ModuleManager.byCategory(CATS[selectedCategory]);
+        List<Module> mods = ModuleManager.byCategory(getCategoryKey(selectedCategory));
         int enabledCount = 0;
         for (Module m : mods) if (m.enabled) enabledCount++;
         ctx.drawTextWithShadow(textRenderer, Text.literal(enabledCount + "/" + mods.size() + " вкл"),
@@ -169,7 +173,7 @@ public class ClickGuiScreen extends Screen {
             int tc = m.enabled ? C_TEXT : C_TEXT_DIM;
             ctx.drawTextWithShadow(textRenderer, Text.literal(m.name), mx + 8, ry + 6, tc);
 
-            // BIND
+            // Кнопка бинда
             int bindW = 22, bindH = 12;
             int bindX = mx + MIDDLE_W - 22 - bindW - 6;
             int bindY = ry + 4;
@@ -187,7 +191,7 @@ public class ClickGuiScreen extends Screen {
             ctx.drawTextWithShadow(textRenderer, Text.literal(bindText),
                     bindX + (bindW - tw) / 2, bindY + 2, bindTextColor);
 
-            // TOGGLE
+            // Тумблер
             int tr = 5;
             int tx = mx + MIDDLE_W - 12;
             int ty = ry + 10;
@@ -202,7 +206,7 @@ public class ClickGuiScreen extends Screen {
             }
         }
 
-        // RIGHT
+        // === RIGHT (настройки) ===
         int rx = mx + MIDDLE_W + 1;
         ctx.fill(rx, y, rx + RIGHT_W, y + H, C_RIGHT);
         ctx.fill(rx - 1, y, rx, y + H, C_BORDER);
@@ -211,30 +215,27 @@ public class ClickGuiScreen extends Screen {
         ctx.fill(rx, y + 20, rx + RIGHT_W, y + 21, C_BORDER);
 
         if (selectedModule != null && !selectedModule.settings.isEmpty()) {
-            // === ПРОКРУТКА: ограничиваем область ===
             int panelTop = y + 24;
             int panelBottom = y + H - 4;
             int panelHeight = panelBottom - panelTop;
 
-            // Максимальная высота контента
             int contentHeight = 0;
             for (Module.Setting s : selectedModule.settings) {
                 contentHeight += s.isBool ? 24 : 32;
             }
 
-            // Максимальный скролл
             int maxScroll = Math.max(0, contentHeight - panelHeight);
             if (rightScroll > maxScroll) rightScroll = maxScroll;
             if (rightScroll < 0) rightScroll = 0;
 
-            // Обрезаем область
             ctx.enableScissor(rx, panelTop, rx + RIGHT_W, panelBottom);
 
             int ry2 = panelTop - rightScroll;
             for (Module.Setting s : selectedModule.settings) {
                 if (s.isBool) {
                     if (ry2 + 24 >= panelTop && ry2 <= panelBottom) {
-                        ctx.drawTextWithShadow(textRenderer, Text.literal(s.name), rx + 8, ry2 + 4, C_TEXT);
+                        String localized = translateSetting(s.name);
+                        ctx.drawTextWithShadow(textRenderer, Text.literal(localized), rx + 8, ry2 + 4, C_TEXT);
 
                         int tr = 5;
                         int tx = rx + RIGHT_W - 12;
@@ -252,7 +253,8 @@ public class ClickGuiScreen extends Screen {
                     ry2 += 24;
                 } else {
                     if (ry2 + 32 >= panelTop && ry2 <= panelBottom) {
-                        ctx.drawTextWithShadow(textRenderer, Text.literal(s.name), rx + 8, ry2, C_TEXT);
+                        String localized = translateSetting(s.name);
+                        ctx.drawTextWithShadow(textRenderer, Text.literal(localized), rx + 8, ry2, C_TEXT);
 
                         String valStr = (s.step >= 1f) ? String.valueOf((int) s.value) : String.format("%.1f", s.value);
                         int vw = textRenderer.getWidth(valStr);
@@ -318,17 +320,78 @@ public class ClickGuiScreen extends Screen {
                 bx + 12, by + 50, C_TEXT_DIM);
     }
 
+    /**
+     * Русская категория → английский ключ для ModuleManager
+     */
+    private String getCategoryKey(int index) {
+        switch (index) {
+            case 0: return "Combat";
+            case 1: return "Movement";
+            case 2: return "Render";
+            case 3: return "Player";
+            case 4: return "Utilities";
+            case 5: return "Themes";
+            case 6: return "Configs";
+            default: return "Combat";
+        }
+    }
+
+    /**
+     * Перевод названий настроек модулей
+     */
+    private String translateSetting(String name) {
+        switch (name) {
+            // TriggerBot
+            case "Range": return "Дистанция";
+            case "Min Delay": return "Мин. задержка";
+            case "Max Delay": return "Макс. задержка";
+            case "Randomize": return "Рандомизация";
+            case "Crit Only": return "Только криты";
+            case "Smart Crits": return "Умные криты";
+            case "Early Mace": return "Ранний удар";
+            case "Through Blocks": return "Через блоки";
+            case "Through Players": return "Через игроков";
+            case "Hit While Eating": return "Бить когда ешь";
+            case "Weapon Only": return "Только оружием";
+            case "Sprint Reset": return "Сброс спринта";
+            case "Players": return "Игроки";
+            case "No Armor": return "Без брони";
+            case "Mobs": return "Мобы";
+            case "Animals": return "Животные";
+            case "Friends": return "Друзья";
+            case "Invisible": return "Невидимые";
+            case "No GUI": return "Не бить в GUI";
+            case "Focus One": return "Фокус на одном";
+            case "Whitelist": return "Белый список";
+
+            // KillAura
+            case "Use Rotation": return "Использовать Rotation";
+            case "Walls": return "Через стены";
+            case "Min CPS": return "Мин. CPS";
+            case "Max CPS": return "Макс. CPS";
+
+            // Rotation
+            case "Speed": return "Скорость";
+            case "Smooth": return "Плавность";
+            case "Jitter": return "Дрожание";
+            case "Mode": return "Режим";
+            case "Reaction": return "Реакция";
+
+            default: return name;
+        }
+    }
+
     private String getKeyName(int key) {
         String name = GLFW.glfwGetKeyName(key, 0);
         if (name != null) return name.toUpperCase();
         switch (key) {
-            case GLFW.GLFW_KEY_SPACE: return "SPC";
-            case GLFW.GLFW_KEY_LEFT_SHIFT: return "LSH";
-            case GLFW.GLFW_KEY_RIGHT_SHIFT: return "RSH";
-            case GLFW.GLFW_KEY_LEFT_CONTROL: return "LCT";
-            case GLFW.GLFW_KEY_RIGHT_CONTROL: return "RCT";
-            case GLFW.GLFW_KEY_LEFT_ALT: return "LAL";
-            case GLFW.GLFW_KEY_RIGHT_ALT: return "RAL";
+            case GLFW.GLFW_KEY_SPACE: return "ПРОБЕЛ";
+            case GLFW.GLFW_KEY_LEFT_SHIFT: return "ЛSH";
+            case GLFW.GLFW_KEY_RIGHT_SHIFT: return "ПSH";
+            case GLFW.GLFW_KEY_LEFT_CONTROL: return "ЛCTRL";
+            case GLFW.GLFW_KEY_RIGHT_CONTROL: return "ПCTRL";
+            case GLFW.GLFW_KEY_LEFT_ALT: return "ЛALT";
+            case GLFW.GLFW_KEY_RIGHT_ALT: return "ПALT";
             case GLFW.GLFW_KEY_TAB: return "TAB";
             case GLFW.GLFW_KEY_ENTER: return "ENT";
             default: return "K" + key;
@@ -342,7 +405,6 @@ public class ClickGuiScreen extends Screen {
         int mx2 = x + SIDEBAR_W + 1;
         int rx = mx2 + MIDDLE_W + 1;
 
-        // Скролл только если курсор в правой панели и есть выбранный модуль
         if (selectedModule != null && mx >= rx && mx <= rx + RIGHT_W
                 && my >= y + 24 && my <= y + H - 4) {
             rightScroll -= (int)(vertical * 15);
@@ -360,7 +422,6 @@ public class ClickGuiScreen extends Screen {
             return true;
         }
 
-        // Настройки открыты — проверяем клики по слайдерам/тумблерам
         if (selectedModule != null && button == 0) {
             int x = (int) guiX;
             int y = (int) guiY;
@@ -408,7 +469,6 @@ public class ClickGuiScreen extends Screen {
         int x = (int) guiX;
         int y = (int) guiY;
 
-        // Категории
         for (int i = 0; i < CATS.length; i++) {
             int cy2 = y + 46 + i * 20;
             if (mx >= x && mx <= x + SIDEBAR_W && my >= cy2 && my <= cy2 + 18) {
@@ -419,9 +479,8 @@ public class ClickGuiScreen extends Screen {
             }
         }
 
-        // Модули
         int mx2 = x + SIDEBAR_W + 1;
-        List<Module> mods = ModuleManager.byCategory(CATS[selectedCategory]);
+        List<Module> mods = ModuleManager.byCategory(getCategoryKey(selectedCategory));
         for (int i = 0; i < mods.size(); i++) {
             int ry = y + 36 + i * 22;
             if (ry + 20 > y + H - 4) break;
@@ -455,7 +514,6 @@ public class ClickGuiScreen extends Screen {
             }
         }
 
-        // Шапка — перетаскивание
         if (mx >= x && mx <= x + W && my >= y && my <= y + 20 && button == 0) {
             dragging = true;
             dragOffX = mx - guiX;
@@ -509,4 +567,4 @@ public class ClickGuiScreen extends Screen {
         }
         return super.keyPressed(keyCode, scanCode, modifiers);
     }
-            }
+    }
